@@ -17,5 +17,7 @@ jobs:
           node-version: 20
       - run: npm install -g pnpm
       - run: pnpm install --no-frozen-lockfile
-      - run: pnpm build || echo "Build configured"
-      - run: echo "eOffice CI passed"
+      - run: pnpm run build
+      - run: pnpm run test
+      - run: pnpm run lint
+      - run: pnpm run typecheck

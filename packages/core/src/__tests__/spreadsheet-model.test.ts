@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { SpreadsheetModel } from '../spreadsheet-model';
 
 describe('SpreadsheetModel', () => {
-  // ── Constructor ──────────────────────────────────────────────────
-
   describe('Constructor', () => {
     it('creates with one default sheet', () => {
       const model = new SpreadsheetModel();
@@ -15,8 +13,6 @@ describe('SpreadsheetModel', () => {
       expect(model.sheets[0].name).toBe('Sheet 1');
     });
   });
-
-  // ── Sheet management ─────────────────────────────────────────────
 
   describe('Sheet management', () => {
     it('addSheet creates a new sheet with given name', () => {
@@ -69,8 +65,6 @@ describe('SpreadsheetModel', () => {
       expect(model.activeSheetId).toBe(originalActiveId);
     });
   });
-
-  // ── Cell operations ──────────────────────────────────────────────
 
   describe('Cell operations', () => {
     it('setCell stores a plain value', () => {
@@ -129,8 +123,6 @@ describe('SpreadsheetModel', () => {
     });
   });
 
-  // ── Cell address ─────────────────────────────────────────────────
-
   describe('Cell address', () => {
     it('getCellAddress(0, 0) returns "A1"', () => {
       const model = new SpreadsheetModel();
@@ -147,8 +139,6 @@ describe('SpreadsheetModel', () => {
       expect(model.getCellAddress(0, 26)).toBe('AA1');
     });
   });
-
-  // ── Formula engine ───────────────────────────────────────────────
 
   describe('Formula engine', () => {
     it('SUM(A1:A3) computes sum of range', () => {
@@ -263,8 +253,6 @@ describe('SpreadsheetModel', () => {
     });
   });
 
-  // ── CSV ──────────────────────────────────────────────────────────
-
   describe('CSV', () => {
     it('exportCSV produces comma-separated output', () => {
       const model = new SpreadsheetModel();
@@ -302,8 +290,6 @@ describe('SpreadsheetModel', () => {
     });
   });
 
-  // ── JSON serialization ──────────────────────────────────────────
-
   describe('JSON serialization', () => {
     it('toJSON returns serializable object with sheets and activeSheetId', () => {
       const model = new SpreadsheetModel();
@@ -334,8 +320,6 @@ describe('SpreadsheetModel', () => {
       expect(restored.getCell(restoredSheetId, 0, 1)?.value).toBe('42');
     });
   });
-
-  // ── Statistics ───────────────────────────────────────────────────
 
   describe('Statistics', () => {
     it('getCellCount returns number of non-empty cells', () => {

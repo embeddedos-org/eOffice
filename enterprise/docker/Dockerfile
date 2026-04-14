@@ -3,7 +3,7 @@ LABEL maintainer="embeddedos-org" description="Office Suite — EoS Enterprise"
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --production
+RUN npm install -g pnpm && pnpm install --prod
 COPY . .
 
 EXPOSE 8080

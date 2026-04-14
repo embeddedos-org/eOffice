@@ -189,7 +189,6 @@ describe('DocumentModel', () => {
       const doc = new DocumentModel();
       doc.addBlock('paragraph', 'Hi');
       doc.addBlock('paragraph', 'Lo');
-      // "Hi\nLo" = 5 chars
       expect(doc.getCharCount()).toBe(5);
     });
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   generateId,
   formatDate,
@@ -6,6 +6,7 @@ import {
   escapeJson,
   debounce,
 } from '../utils';
+import { vi, beforeEach, afterEach } from 'vitest';
 
 describe('generateId', () => {
   it('returns a string of length 36 (UUID format)', () => {

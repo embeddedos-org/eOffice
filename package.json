@@ -37,6 +37,7 @@
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
+    "typecheck": "pnpm -r exec tsc --noEmit",
     "clean": "rm -rf node_modules packages/*/dist apps/*/dist"
   },
   "devDependencies": {

@@ -2,7 +2,7 @@
     <id>org.embeddedos.eoffice</id>
     <name>eOffice Suite</name>
     <version>0.1.0</version>
-    <vendor email="dev@embeddedos.org" url="https://github.com/nicheOS/eOffice">EmbeddedOS</vendor>
+    <vendor email="dev@embeddedos.org" url="https://github.com/embeddedos-org/eOffice">EmbeddedOS</vendor>
 
     <description><![CDATA[
         <p>AI-powered office suite integration for JetBrains IDEs.</p>

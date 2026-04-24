@@ -1,0 +1,45 @@
+name: Nightly Build & Test
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run all tests
+        run: |
+          cd packages/core && pnpm test && cd ../..
+          cd packages/server && pnpm test && cd ../..
+          cd packages/ebot-client && pnpm test && cd ../..
+
+      - name: Security audit
+        run: pnpm audit --audit-level=high || true
+
+      - name: Build all apps
+        run: |
+          for app in email edocs enotes esheets eslides edb edrive econnect eforms esway eplanner launcher; do
+            echo "Building $app..."
+            cd apps/$app && pnpm build && cd ../..
+          done

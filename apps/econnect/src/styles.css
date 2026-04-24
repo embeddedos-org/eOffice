@@ -356,3 +356,104 @@ body {
 @media (max-width: 768px) {
   .ebot-sidebar.open { position: absolute; right: 0; top: 0; bottom: 0; z-index: 50; box-shadow: var(--shadow-md); }
 }
+
+/* === Presence Dots === */
+.presence-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.presence-dot.online { background: var(--success); box-shadow: 0 0 4px rgba(52, 168, 83, 0.5); }
+.presence-dot.offline { background: var(--text-tertiary); }
+
+.user-item { cursor: default; }
+.user-last-seen { font-size: 10px; color: var(--text-tertiary); }
+
+.message-presence {
+  position: absolute; bottom: -1px; right: -1px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-tertiary); border: 2px solid var(--bg-primary);
+}
+.message-presence.online { background: var(--success); }
+
+.message-avatar {
+  position: relative;
+}
+
+/* === Typing Indicator === */
+.typing-indicator {
+  display: flex; align-items: center; gap: 8px; padding: 4px 8px;
+  font-size: 12px; color: var(--text-tertiary); font-style: italic;
+}
+.typing-dots { display: flex; gap: 3px; }
+.typing-dots span {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--text-tertiary); animation: typingBounce 1.4s infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
+}
+
+/* === File Message === */
+.message-file-card {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  background: var(--bg-secondary); border: 1px solid var(--border-color);
+  border-radius: var(--radius-md); margin-top: 4px; max-width: 300px;
+}
+.message-file-icon { font-size: 20px; flex-shrink: 0; }
+.message-file-info { flex: 1; min-width: 0; }
+.message-file-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.message-file-size { font-size: 10px; color: var(--text-tertiary); }
+.message-file-download {
+  width: 28px; height: 28px; border: none; border-radius: var(--radius-sm);
+  background: transparent; cursor: pointer; font-size: 14px; flex-shrink: 0;
+}
+.message-file-download:hover { background: var(--bg-hover); }
+
+/* === Attach Button === */
+.message-attach-btn {
+  width: 32px; height: 32px; border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm); background: var(--bg-secondary);
+  cursor: pointer; font-size: 14px; flex-shrink: 0; display: flex;
+  align-items: center; justify-content: center;
+}
+.message-attach-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+
+/* === Channel Dialog === */
+.dialog-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 200; display: flex; align-items: center; justify-content: center;
+}
+.dialog {
+  width: 420px; background: var(--bg-primary); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md); padding: 20px; display: flex; flex-direction: column; gap: 14px;
+}
+.dialog-header { display: flex; align-items: center; justify-content: space-between; }
+.dialog-header h3 { font-size: 16px; font-weight: 600; }
+.dialog-close {
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: var(--radius-sm); background: transparent;
+  color: var(--text-secondary); cursor: pointer; font-size: 16px;
+}
+.dialog-close:hover { background: var(--bg-hover); }
+.dialog-label {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+}
+.dialog-label input {
+  padding: 8px 12px; border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm); font-size: 13px; font-family: var(--font-sans);
+  color: var(--text-primary); background: var(--bg-primary); outline: none;
+}
+.dialog-label input:focus { border-color: var(--accent); }
+.dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.dialog-btn {
+  padding: 8px 16px; border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;
+  cursor: pointer; background: var(--bg-primary); color: var(--text-primary);
+}
+.dialog-btn:hover { background: var(--bg-hover); }
+.dialog-btn.primary { background: var(--accent); color: var(--text-inverse); border-color: var(--accent); }
+.dialog-btn.primary:hover { background: var(--accent-hover); }
+.dialog-btn:disabled { opacity: 0.5; cursor: not-allowed; }

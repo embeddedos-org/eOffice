@@ -1,11 +1,13 @@
 interface TopBarProps {
   onNewChannel: () => void;
+  onStartCall: () => void;
   ebotOpen: boolean;
   onToggleEBot: () => void;
   connected: boolean;
+  inCall: boolean;
 }
 
-export default function TopBar({ onNewChannel, ebotOpen, onToggleEBot, connected }: TopBarProps) {
+export default function TopBar({ onNewChannel, onStartCall, ebotOpen, onToggleEBot, connected, inCall }: TopBarProps) {
   return (
     <div className="topbar">
       <div className="topbar-left">
@@ -14,6 +16,9 @@ export default function TopBar({ onNewChannel, ebotOpen, onToggleEBot, connected
       </div>
       <div className="topbar-right">
         <button className="topbar-action-btn" onClick={onNewChannel}>➕ New Channel</button>
+        <button className={`topbar-action-btn ${inCall ? 'active' : ''}`} onClick={onStartCall}>
+          📹 {inCall ? 'In Call' : 'Start Call'}
+        </button>
         <div className={`topbar-status ${connected ? 'connected' : 'disconnected'}`}>
           <span className="topbar-status-dot" />
           <span>eBot {connected ? 'Online' : 'Offline'}</span>

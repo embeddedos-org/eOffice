@@ -5,6 +5,7 @@ interface TopBarProps {
   onToggleEBot: () => void;
   connected: boolean;
   onPresent: () => void;
+  onExport?: () => void;
 }
 
 export default function TopBar({
@@ -14,6 +15,7 @@ export default function TopBar({
   onToggleEBot,
   connected,
   onPresent,
+  onExport,
 }: TopBarProps) {
   return (
     <div className="topbar">
@@ -34,6 +36,11 @@ export default function TopBar({
           <button className="topbar-action-btn" onClick={onPresent} title="Present">
             ▶ Present
           </button>
+          {onExport && (
+            <button className="topbar-action-btn" onClick={onExport} title="Export to PowerPoint">
+              📥 Export
+            </button>
+          )}
         </div>
         <div className={`topbar-status ${connected ? 'connected' : 'disconnected'}`}>
           <span className="topbar-status-dot" />

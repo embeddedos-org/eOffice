@@ -48,12 +48,37 @@ export function useDatabase() {
     setSelectedTableId((prev) => (prev === id ? null : prev));
   }, []);
 
-  const insertRow = useCallback((tableId: string) => {
+  const insertRow = useCallback((tableId: string, data?: Record<string, string>) => {
     setTables((prev) => prev.map((t) => {
       if (t.id !== tableId) return t;
-      const row: Record<string, string> = {};
-      t.columns.forEach((c) => { row[c.name] = ''; });
+      const row: Record<string, string> = data ? { ...data } : {};
+      if (!data) t.columns.forEach((c) => { row[c.name] = ''; });
       return { ...t, rows: [...t.rows, row] };
+    }));
+  }, []);
+
+  const importCSV = useCallback((tableId: string, csvText: string) => {
+    const lines = csvText.trim().split('\n');
+    if (lines.length < 2) return;
+    const headers = lines[0].split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
+    setTables((prev) => prev.map((t) => {
+      if (t.id !== tableId) return t;
+      // Add any missing columns
+      const newCols = [...t.columns];
+      headers.forEach((h) => {
+        if (!newCols.find((c) => c.name === h)) {
+          newCols.push({ name: h, type: 'TEXT' });
+        }
+      });
+      // Parse rows
+      const newRows = [...t.rows];
+      for (let i = 1; i < lines.length; i++) {
+        const vals = lines[i].split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
+        const row: Record<string, string> = {};
+        headers.forEach((h, j) => { row[h] = vals[j] || ''; });
+        newRows.push(row);
+      }
+      return { ...t, columns: newCols, rows: newRows };
     }));
   }, []);
 
@@ -77,6 +102,6 @@ export function useDatabase() {
   return {
     tables, selectedTableId, selectedTable, totalRows,
     setSelectedTableId, createTable, dropTable,
-    insertRow, updateRow, deleteRow,
+    insertRow, updateRow, deleteRow, importCSV,
   };
 }

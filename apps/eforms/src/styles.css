@@ -283,3 +283,78 @@ body {
   .ebot-sidebar.open { position: absolute; right: 0; top: 0; bottom: 0; z-index: 50; box-shadow: var(--shadow-md); }
   .field-editor { display: none; }
 }
+
+/* === Star Rating === */
+.star-rating { display: flex; align-items: center; gap: 4px; }
+.star { font-size: 24px; cursor: pointer; color: var(--border-color); transition: color 0.15s; }
+.star.filled { color: #f59e0b; }
+.star:hover { color: #fbbf24; }
+.star-rating-label { font-size: 12px; color: var(--text-secondary); margin-left: 8px; }
+
+/* === File Upload Field === */
+.form-preview-file-upload {
+  padding: 12px; border: 2px dashed var(--border-color); border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+.form-preview-file-upload input[type="file"] { font-size: 12px; }
+.form-preview-file-name {
+  margin-top: 6px; font-size: 12px; color: var(--accent); font-weight: 500;
+}
+
+/* === Submitted Banner === */
+.form-submitted-banner {
+  padding: 10px 16px; background: #dcfce7; color: #15803d;
+  border: 1px solid #bbf7d0; border-radius: var(--radius-md);
+  font-size: 13px; font-weight: 600; text-align: center; margin-bottom: 12px;
+}
+
+/* === Field Editor Section === */
+.field-editor-section {
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-color);
+}
+.field-editor-section-title {
+  font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;
+}
+
+/* === Responses View === */
+.responses-view-container { flex: 1; overflow-y: auto; padding: 24px; display: flex; justify-content: center; }
+.responses-view { width: 100%; max-width: 800px; }
+.responses-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;
+}
+.responses-header h3 { font-size: 18px; font-weight: 600; }
+.responses-export-btn {
+  padding: 6px 14px; border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm); background: var(--bg-primary);
+  color: var(--text-primary); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.responses-export-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+
+.responses-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 60px; color: var(--text-tertiary); gap: 8px;
+}
+
+.responses-charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.responses-chart {
+  padding: 16px; background: var(--bg-primary); border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+.responses-chart-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+.responses-chart-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.responses-chart-label { width: 80px; font-size: 11px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.responses-chart-track { flex: 1; height: 16px; background: var(--bg-tertiary); border-radius: var(--radius-sm); overflow: hidden; }
+.responses-chart-fill { height: 100%; border-radius: var(--radius-sm); transition: width 0.3s; min-width: 2px; }
+.responses-chart-count { width: 24px; font-size: 11px; text-align: right; color: var(--text-secondary); }
+
+.responses-table-container { overflow-x: auto; }
+.responses-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.responses-table th {
+  padding: 8px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-color);
+  font-weight: 600; text-align: left; color: var(--text-secondary); white-space: nowrap;
+}
+.responses-table td {
+  padding: 6px 12px; border: 1px solid var(--border-light);
+  color: var(--text-primary); max-width: 200px; overflow: hidden; text-overflow: ellipsis;
+}
+.responses-table tr:hover td { background: var(--bg-hover); }

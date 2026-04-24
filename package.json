@@ -35,6 +35,8 @@
     "dev:planner": "npm run dev --workspace=apps/eplanner",
     "dev:server": "npm run dev --workspace=packages/server",
     "build": "npm run build --workspaces",
+    "build:all": "bash build-all-apps.sh",
+    "build:desktop": "npm run build:all && cd desktop && npm run build:win",
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
     "typecheck": "pnpm -r exec tsc --noEmit",

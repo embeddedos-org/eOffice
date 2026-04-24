@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import type { FolderInfo } from '../components/FolderTree';
 
-export type Folder = 'inbox' | 'sent' | 'drafts' | string;
+export type Folder = 'inbox' | 'sent' | 'drafts' | 'spam' | 'trash' | 'archive' | string;
 
 export interface Email {
   id: string;
@@ -12,6 +13,9 @@ export interface Email {
   read: boolean;
   starred: boolean;
   folder: Folder;
+  hasAttachments?: boolean;
+  cc?: string;
+  bcc?: string;
 }
 
 export interface EmailAccount {
@@ -27,10 +31,13 @@ let nextId = 1;
 const uid = () => `msg-${nextId++}`;
 
 const SAMPLE_EMAILS: Email[] = [
-  { id: uid(), from: 'alice@eoffice.com', to: 'me@eoffice.com', subject: 'Q2 Planning Meeting', body: 'Hi team,\n\nLet\'s schedule our Q2 planning meeting for next Tuesday at 2 PM.\n\nPlease come prepared with your OKR proposals.\n\nBest,\nAlice', date: '2026-04-03', read: false, starred: false, folder: 'inbox' },
-  { id: uid(), from: 'bob@eoffice.com', to: 'me@eoffice.com', subject: 'Code Review: PR #142', body: 'Hey,\n\nI\'ve reviewed your PR. A few comments:\n\n1. Consider adding error handling in the auth module\n2. The test coverage looks good\n3. Minor style issue on line 45\n\nOverall LGTM with minor changes.\n\n— Bob', date: '2026-04-02', read: true, starred: true, folder: 'inbox' },
-  { id: uid(), from: 'carol@eoffice.com', to: 'me@eoffice.com', subject: 'Design Assets Ready', body: 'Hi,\n\nThe design assets for the new landing page are ready for development.\n\nYou can find them in the shared drive.\n\nThanks,\nCarol', date: '2026-04-01', read: true, starred: false, folder: 'inbox' },
-  { id: uid(), from: 'me@eoffice.com', to: 'team@eoffice.com', subject: 'Sprint Recap', body: 'Team,\n\nGreat work this sprint! We completed 15 story points and shipped 3 features.\n\nSee you at the retro tomorrow.\n\nCheers', date: '2026-03-31', read: true, starred: false, folder: 'sent' },
+  { id: uid(), from: 'alice@eoffice.com', to: 'me@eoffice.com', subject: 'Q2 Planning Meeting', body: 'Hi team,\n\nLet\'s schedule our Q2 planning meeting for next Tuesday at 2 PM.\n\nPlease come prepared with your OKR proposals.\n\nBest,\nAlice', date: '2026-04-03', read: false, starred: false, folder: 'inbox', hasAttachments: false },
+  { id: uid(), from: 'bob@eoffice.com', to: 'me@eoffice.com', subject: 'Code Review: PR #142', body: 'Hey,\n\nI\'ve reviewed your PR. A few comments:\n\n1. Consider adding error handling in the auth module\n2. The test coverage looks good\n3. Minor style issue on line 45\n\nOverall LGTM with minor changes.\n\n— Bob', date: '2026-04-02', read: true, starred: true, folder: 'inbox', hasAttachments: true },
+  { id: uid(), from: 'carol@eoffice.com', to: 'me@eoffice.com', subject: 'Design Assets Ready', body: 'Hi,\n\nThe design assets for the new landing page are ready for development.\n\nYou can find them in the shared drive.\n\nThanks,\nCarol', date: '2026-04-01', read: true, starred: false, folder: 'inbox', hasAttachments: true },
+  { id: uid(), from: 'me@eoffice.com', to: 'team@eoffice.com', subject: 'Sprint Recap', body: 'Team,\n\nGreat work this sprint! We completed 15 story points and shipped 3 features.\n\nSee you at the retro tomorrow.\n\nCheers', date: '2026-03-31', read: true, starred: false, folder: 'sent', hasAttachments: false },
+  { id: uid(), from: 'newsletter@tech.com', to: 'me@eoffice.com', subject: 'Weekly Tech Digest', body: 'This week in tech:\n\n• AI advances in code generation\n• New framework releases\n• Cloud computing trends\n\nRead more at tech.com', date: '2026-04-03', read: false, starred: false, folder: 'inbox', hasAttachments: false },
+  { id: uid(), from: 'me@eoffice.com', to: 'alice@eoffice.com', subject: 'Re: Q2 Planning Meeting', body: 'Hi Alice,\n\nTuesday at 2 PM works for me. I\'ll prepare the engineering OKRs.\n\nBest,\nMe', date: '2026-04-03', read: true, starred: false, folder: 'sent', hasAttachments: false },
+  { id: uid(), from: 'me@eoffice.com', to: 'bob@eoffice.com', subject: 'Draft: Project Proposal', body: 'Working on the project proposal for Q3. Need to finalize the budget section.', date: '2026-04-04', read: true, starred: false, folder: 'drafts', hasAttachments: false },
 ];
 
 export function useMailbox() {
@@ -41,13 +48,13 @@ export function useMailbox() {
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
   const [serverOnline, setServerOnline] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [imapFolders, setImapFolders] = useState<FolderInfo[]>([]);
   const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const selectedEmail = messages.find((m) => m.id === selectedId) || null;
   const folderMessages = messages.filter((m) => m.folder === currentFolder);
   const unreadCount = messages.filter((m) => m.folder === 'inbox' && !m.read).length;
 
-  // Check server availability
   const checkServer = useCallback(async () => {
     try {
       const ctrl = new AbortController();
@@ -62,7 +69,6 @@ export function useMailbox() {
     }
   }, []);
 
-  // Fetch accounts from server
   const fetchAccounts = useCallback(async () => {
     try {
       const res = await fetch(`${SERVER_URL}/api/email/accounts`);
@@ -74,11 +80,31 @@ export function useMailbox() {
         }
       }
     } catch {
-      // Server offline, use mock mode
+      // Server offline
     }
   }, [account]);
 
-  // Fetch messages from server
+  const fetchFolders = useCallback(async (acct?: EmailAccount) => {
+    const activeAccount = acct || account;
+    if (!activeAccount) return;
+    try {
+      const res = await fetch(`${SERVER_URL}/api/email/folders?accountId=${activeAccount.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        const mapped: FolderInfo[] = (data.folders || []).map((f: any) => ({
+          name: f.name,
+          path: f.path,
+          icon: getFolderIcon(f.specialUse || f.name),
+          unreadCount: f.unseenCount || 0,
+          specialUse: f.specialUse,
+        }));
+        setImapFolders(mapped);
+      }
+    } catch {
+      // Use defaults
+    }
+  }, [account]);
+
   const fetchMessages = useCallback(async (acct?: EmailAccount) => {
     const activeAccount = acct || account;
     if (!activeAccount) return;
@@ -89,6 +115,9 @@ export function useMailbox() {
         inbox: 'INBOX',
         sent: '[Gmail]/Sent Mail',
         drafts: '[Gmail]/Drafts',
+        spam: '[Gmail]/Spam',
+        trash: '[Gmail]/Trash',
+        archive: '[Gmail]/All Mail',
       };
       const imapFolder = folderMap[currentFolder] || currentFolder;
       const res = await fetch(
@@ -106,31 +135,32 @@ export function useMailbox() {
           read: m.read,
           starred: m.starred,
           folder: currentFolder,
+          hasAttachments: m.hasAttachments || false,
+          cc: m.cc,
+          bcc: m.bcc,
         }));
         setMessages(mapped);
       }
     } catch {
-      // Keep existing messages on error
+      // Keep existing messages
     } finally {
       setLoading(false);
     }
   }, [account, currentFolder]);
 
-  // Initialize: check server and fetch accounts
   useEffect(() => {
     checkServer().then((online) => {
       if (online) fetchAccounts();
     });
   }, [checkServer, fetchAccounts]);
 
-  // Fetch messages when account or folder changes
   useEffect(() => {
     if (account && serverOnline) {
       fetchMessages();
+      fetchFolders();
     }
-  }, [account, currentFolder, serverOnline, fetchMessages]);
+  }, [account, currentFolder, serverOnline, fetchMessages, fetchFolders]);
 
-  // Auto-refresh inbox
   useEffect(() => {
     if (account && serverOnline) {
       refreshTimer.current = setInterval(() => {
@@ -144,7 +174,7 @@ export function useMailbox() {
 
   const addMessage = useCallback(
     async (email: Omit<Email, 'id'>) => {
-      if (account && serverOnline) {
+      if (account && serverOnline && email.folder === 'sent') {
         try {
           await fetch(`${SERVER_URL}/api/email/messages/send`, {
             method: 'POST',
@@ -154,13 +184,14 @@ export function useMailbox() {
               to: email.to,
               subject: email.subject,
               body: email.body,
+              cc: email.cc,
+              bcc: email.bcc,
             }),
           });
-          // Refresh to see sent message
           setTimeout(() => fetchMessages(), 1000);
           return { ...email, id: 'sending' };
         } catch {
-          // Fall through to local add
+          // Fall through to local
         }
       }
       const newEmail = { ...email, id: uid() };
@@ -179,11 +210,8 @@ export function useMailbox() {
           await fetch(`${SERVER_URL}/api/email/messages/${id}?accountId=${account.id}&folder=${encodeURIComponent(imapFolder)}`, {
             method: 'DELETE',
           });
-          setMessages((prev) => prev.filter((m) => m.id !== id));
-          setSelectedId((prev) => (prev === id ? null : prev));
-          return;
         } catch {
-          // Fall through to local delete
+          // Fall through
         }
       }
       setMessages((prev) => prev.filter((m) => m.id !== id));
@@ -204,7 +232,7 @@ export function useMailbox() {
             body: JSON.stringify({ accountId: account.id, folder: imapFolder, read: true }),
           });
         } catch {
-          // Optimistic update below
+          // Optimistic
         }
       }
       setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, read: true } : m)));
@@ -225,7 +253,7 @@ export function useMailbox() {
             body: JSON.stringify({ accountId: account.id, folder: imapFolder, starred: !msg.starred }),
           });
         } catch {
-          // Optimistic update below
+          // Optimistic
         }
       }
       setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, starred: !m.starred } : m)));
@@ -248,6 +276,30 @@ export function useMailbox() {
     if (account && serverOnline) fetchMessages();
   }, [account, serverOnline, fetchMessages]);
 
+  const createFolder = useCallback(async (name: string) => {
+    if (account && serverOnline) {
+      try {
+        await fetch(`${SERVER_URL}/api/email/folders`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accountId: account.id, name }),
+        });
+        fetchFolders();
+      } catch {
+        // Local fallback
+        setImapFolders((prev) => [
+          ...prev,
+          { name, path: name.toLowerCase(), icon: '📁', unreadCount: 0 },
+        ]);
+      }
+    } else {
+      setImapFolders((prev) => [
+        ...prev,
+        { name, path: name.toLowerCase(), icon: '📁', unreadCount: 0 },
+      ]);
+    }
+  }, [account, serverOnline, fetchFolders]);
+
   return {
     messages,
     folderMessages,
@@ -259,6 +311,7 @@ export function useMailbox() {
     accounts,
     serverOnline,
     loading,
+    imapFolders,
     setCurrentFolder,
     selectEmail,
     addMessage,
@@ -268,5 +321,18 @@ export function useMailbox() {
     switchAccount,
     refreshInbox,
     fetchAccounts,
+    createFolder,
   };
+}
+
+function getFolderIcon(nameOrSpecial: string): string {
+  const lower = nameOrSpecial.toLowerCase();
+  if (lower.includes('inbox') || lower === '\\inbox') return '📥';
+  if (lower.includes('sent') || lower === '\\sent') return '📤';
+  if (lower.includes('draft') || lower === '\\drafts') return '📝';
+  if (lower.includes('spam') || lower.includes('junk') || lower === '\\junk') return '⚠️';
+  if (lower.includes('trash') || lower === '\\trash') return '🗑️';
+  if (lower.includes('archive') || lower === '\\archive') return '📦';
+  if (lower.includes('star') || lower.includes('flag')) return '⭐';
+  return '📁';
 }

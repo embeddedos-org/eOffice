@@ -281,6 +281,84 @@ body {
 
 .upload-zone-icon { font-size: 32px; margin-bottom: 8px; }
 
+/* === Upload Progress === */
+.upload-zone-container { margin: 16px; }
+.upload-progress-list { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.upload-progress-item {
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+  background: var(--bg-primary); border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm); font-size: 12px;
+}
+.upload-progress-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.upload-progress-bar-track { width: 120px; height: 6px; background: var(--bg-tertiary); border-radius: 3px; overflow: hidden; flex-shrink: 0; }
+.upload-progress-bar-fill {
+  height: 100%; background: var(--accent); border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.upload-progress-bar-fill.done { background: var(--success); }
+.upload-progress-pct { width: 36px; text-align: right; font-size: 11px; color: var(--text-secondary); flex-shrink: 0; }
+
+/* === List View === */
+.file-list-view { flex: 1; overflow-y: auto; }
+.file-list-header {
+  display: flex; padding: 8px 16px; border-bottom: 1px solid var(--border-color);
+  background: var(--bg-tertiary); font-size: 11px; font-weight: 600;
+  color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.3px;
+}
+.file-list-row {
+  display: flex; padding: 8px 16px; border-bottom: 1px solid var(--border-light);
+  cursor: pointer; font-size: 13px; align-items: center;
+}
+.file-list-row:hover { background: var(--bg-hover); }
+.file-list-row.selected { background: var(--accent-light); }
+.file-list-col.name { flex: 3; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.file-list-col.type { flex: 1; color: var(--text-secondary); }
+.file-list-col.size { flex: 1; color: var(--text-secondary); }
+.file-list-col.modified { flex: 1; color: var(--text-secondary); }
+.file-list-icon { font-size: 18px; flex-shrink: 0; }
+
+/* === File Preview Actions === */
+.file-preview-actions {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 12px;
+}
+.file-preview-action-btn {
+  padding: 6px 10px; border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm); background: var(--bg-primary);
+  color: var(--text-primary); font-size: 12px; cursor: pointer; text-align: left;
+}
+.file-preview-action-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+.file-preview-action-btn.danger { color: var(--error); }
+.file-preview-action-btn.danger:hover { background: #fef2f2; border-color: var(--error); }
+
+.file-preview-share-link {
+  margin-top: 8px; padding: 8px; background: var(--accent-light);
+  border: 1px solid var(--accent); border-radius: var(--radius-sm);
+}
+.file-preview-link-text {
+  font-size: 10px; font-family: var(--font-mono); color: var(--accent);
+  word-break: break-all;
+}
+
+.file-preview-rename input {
+  width: 100%; padding: 4px 8px; border: 1px solid var(--accent);
+  border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+  text-align: center; outline: none; margin-bottom: 12px;
+}
+
+.file-preview-thumbnail {
+  margin: 8px 0; padding: 20px; background: var(--bg-tertiary);
+  border-radius: var(--radius-sm); text-align: center;
+}
+.file-preview-img-placeholder {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  font-size: 48px;
+}
+.file-preview-content-box {
+  margin: 8px 0; padding: 12px; background: var(--bg-primary);
+  border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+  text-align: center;
+}
+
 /* === eBot Sidebar === */
 .ebot-sidebar {
   width: 0;

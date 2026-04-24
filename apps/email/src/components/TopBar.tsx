@@ -13,13 +13,11 @@ interface TopBarProps {
   onOpenAccountSetup: () => void;
   onRefresh: () => void;
   loading: boolean;
+  onOpenSignatures?: () => void;
+  onOpenRules?: () => void;
+  onToggleContacts?: () => void;
+  onToggleSearch?: () => void;
 }
-
-const FOLDERS: { id: Folder; label: string; emoji: string }[] = [
-  { id: 'inbox', label: 'Inbox', emoji: '📥' },
-  { id: 'sent', label: 'Sent', emoji: '📤' },
-  { id: 'drafts', label: 'Drafts', emoji: '📝' },
-];
 
 export default function TopBar({
   currentFolder,
@@ -34,6 +32,10 @@ export default function TopBar({
   onOpenAccountSetup,
   onRefresh,
   loading,
+  onOpenSignatures,
+  onOpenRules,
+  onToggleContacts,
+  onToggleSearch,
 }: TopBarProps) {
   return (
     <div className="topbar">
@@ -60,38 +62,46 @@ export default function TopBar({
         )}
       </div>
       <div className="topbar-center">
-        {FOLDERS.map((f) => (
-          <button
-            key={f.id}
-            className={`topbar-folder-btn ${currentFolder === f.id ? 'active' : ''}`}
-            onClick={() => onFolderChange(f.id)}
-          >
-            {f.emoji} {f.label}
-            {f.id === 'inbox' && unreadCount > 0 && ` (${unreadCount})`}
+        <button className="topbar-action-btn" onClick={onCompose}>
+          ✏️ Compose
+        </button>
+        <button
+          className="topbar-action-btn"
+          onClick={onRefresh}
+          disabled={loading}
+          title="Refresh inbox"
+        >
+          {loading ? '⏳' : '🔄'}
+        </button>
+        {onToggleSearch && (
+          <button className="topbar-action-btn" onClick={onToggleSearch} title="Search">
+            🔍 Search
           </button>
-        ))}
+        )}
+        {onToggleContacts && (
+          <button className="topbar-action-btn" onClick={onToggleContacts} title="Contacts">
+            👥 Contacts
+          </button>
+        )}
+        {onOpenSignatures && (
+          <button className="topbar-action-btn" onClick={onOpenSignatures} title="Signatures">
+            ✍️
+          </button>
+        )}
+        {onOpenRules && (
+          <button className="topbar-action-btn" onClick={onOpenRules} title="Rules">
+            📋
+          </button>
+        )}
+        <button
+          className="topbar-action-btn"
+          onClick={onOpenAccountSetup}
+          title="Account settings"
+        >
+          ⚙️
+        </button>
       </div>
       <div className="topbar-right">
-        <div className="topbar-actions">
-          <button className="topbar-action-btn" onClick={onCompose}>
-            ✏️ Compose
-          </button>
-          <button
-            className="topbar-action-btn"
-            onClick={onRefresh}
-            disabled={loading}
-            title="Refresh inbox"
-          >
-            {loading ? '⏳' : '🔄'}
-          </button>
-          <button
-            className="topbar-action-btn"
-            onClick={onOpenAccountSetup}
-            title="Account settings"
-          >
-            ⚙️
-          </button>
-        </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {serverOnline && (
             <div

@@ -1,21 +1,18 @@
 import type { DragEvent } from 'react';
-import type { Task, TaskStatus } from '../hooks/usePlanner';
+import type { Task, TaskStatus, KanbanColumn } from '../hooks/usePlanner';
 import TaskCard from './TaskCard';
 
 interface BoardViewProps {
   tasks: Task[];
+  columns: KanbanColumn[];
   filterByStatus: (status: TaskStatus) => Task[];
   onSelectTask: (id: string) => void;
   onMoveTask: (id: string, status: TaskStatus) => void;
+  onAddColumn: () => void;
+  onRemoveColumn: (id: string) => void;
 }
 
-const COLUMNS: { status: TaskStatus; label: string; emoji: string }[] = [
-  { status: 'todo', label: 'To Do', emoji: '📝' },
-  { status: 'in-progress', label: 'In Progress', emoji: '🔄' },
-  { status: 'done', label: 'Done', emoji: '✅' },
-];
-
-export default function BoardView({ filterByStatus, onSelectTask, onMoveTask }: BoardViewProps) {
+export default function BoardView({ columns, filterByStatus, onSelectTask, onMoveTask, onAddColumn, onRemoveColumn }: BoardViewProps) {
   const handleDragOver = (e: DragEvent) => e.preventDefault();
 
   const handleDrop = (e: DragEvent, status: TaskStatus) => {
@@ -26,18 +23,29 @@ export default function BoardView({ filterByStatus, onSelectTask, onMoveTask }: 
 
   return (
     <div className="board">
-      {COLUMNS.map(({ status, label, emoji }) => {
-        const columnTasks = filterByStatus(status);
+      {columns.map(({ id, status, label, emoji }) => {
+        const columnTasks = filterByStatus(label);
         return (
           <div
-            key={status}
+            key={id}
             className="board-column"
             onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, status)}
+            onDrop={(e) => handleDrop(e, label)}
           >
             <div className="board-column-header">
               <span>{emoji} {label}</span>
-              <span className="board-column-count">{columnTasks.length}</span>
+              <div className="board-column-header-right">
+                <span className="board-column-count">{columnTasks.length}</span>
+                {columns.length > 1 && (
+                  <button
+                    className="board-column-remove"
+                    onClick={() => onRemoveColumn(id)}
+                    title="Remove column"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
             <div className="board-column-body">
               {columnTasks.map((task) => (
@@ -47,6 +55,10 @@ export default function BoardView({ filterByStatus, onSelectTask, onMoveTask }: 
           </div>
         );
       })}
+      <div className="board-add-column" onClick={onAddColumn}>
+        <span>＋</span>
+        <span>Add Column</span>
+      </div>
     </div>
   );
 }

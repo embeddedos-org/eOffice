@@ -1,15 +1,30 @@
 import { useState, useCallback } from 'react';
 import TopBar from './components/TopBar';
+import FolderTree from './components/FolderTree';
 import InboxList from './components/InboxList';
 import EmailViewer from './components/EmailViewer';
 import EmailComposer from './components/EmailComposer';
 import EBotSidebar from './components/EBotSidebar';
 import StatusBar from './components/StatusBar';
 import AccountSetup from './components/AccountSetup';
+import ContactsPanel from './components/ContactsPanel';
+import type { Contact } from './components/ContactsPanel';
+import SearchBar from './components/SearchBar';
+import type { SearchFilters } from './components/SearchBar';
+import SignatureEditor, {
+  loadSignatures,
+  saveSignatures,
+  getDefaultSignature,
+} from './components/SignatureEditor';
+import type { EmailSignature } from './components/SignatureEditor';
+import RulesEditor, { loadRules, saveRules } from './components/RulesEditor';
+import type { EmailRule } from './components/RulesEditor';
 import { useMailbox } from './hooks/useMailbox';
 import { useEBot } from './hooks/useEBot';
 
 const SERVER_URL = 'http://localhost:3001';
+
+type SidePanel = 'none' | 'contacts' | 'search';
 
 export default function App() {
   const [ebotOpen, setEbotOpen] = useState(false);
@@ -17,14 +32,33 @@ export default function App() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerDefaults, setComposerDefaults] = useState({ to: '', subject: '', body: '' });
   const [accountSetupOpen, setAccountSetupOpen] = useState(false);
+  const [signatureEditorOpen, setSignatureEditorOpen] = useState(false);
+  const [rulesEditorOpen, setRulesEditorOpen] = useState(false);
+  const [sidePanel, setSidePanel] = useState<SidePanel>('none');
+
+  const [signatures, setSignatures] = useState<EmailSignature[]>(loadSignatures());
+  const [rules, setRules] = useState<EmailRule[]>(loadRules());
+  const [contacts, setContacts] = useState<Contact[]>(() => {
+    try {
+      const stored = localStorage.getItem('eoffice-email-contacts');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [searchResults, setSearchResults] = useState<null | number>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   const mailbox = useMailbox();
   const ebot = useEBot();
 
-  const folderLabels = { inbox: 'Inbox', sent: 'Sent', drafts: 'Drafts' };
-
   const handleCompose = useCallback(() => {
     setComposerDefaults({ to: '', subject: '', body: '' });
+    setComposerOpen(true);
+  }, []);
+
+  const handleComposeToContact = useCallback((email: string) => {
+    setComposerDefaults({ to: email, subject: '', body: '' });
     setComposerOpen(true);
   }, []);
 
@@ -51,7 +85,7 @@ export default function App() {
   }, [mailbox.selectedEmail]);
 
   const handleSend = useCallback(
-    (to: string, subject: string, body: string) => {
+    (to: string, subject: string, body: string, cc?: string, bcc?: string, files?: File[]) => {
       mailbox.addMessage({
         from: mailbox.account?.email || 'me@eoffice.com',
         to,
@@ -61,10 +95,155 @@ export default function App() {
         read: true,
         starred: false,
         folder: 'sent',
+        hasAttachments: (files?.length || 0) > 0,
+      });
+
+      // Auto-add contact
+      if (to && !contacts.find((c) => c.email === to)) {
+        const newContact: Contact = {
+          id: `contact-${Date.now()}`,
+          name: to.split('@')[0],
+          email: to,
+          lastContacted: new Date().toISOString(),
+        };
+        const updated = [...contacts, newContact];
+        setContacts(updated);
+        localStorage.setItem('eoffice-email-contacts', JSON.stringify(updated));
+      }
+    },
+    [mailbox, contacts],
+  );
+
+  const handleSaveDraft = useCallback(
+    (to: string, subject: string, body: string) => {
+      mailbox.addMessage({
+        from: mailbox.account?.email || 'me@eoffice.com',
+        to,
+        subject,
+        body,
+        date: new Date().toISOString().split('T')[0],
+        read: true,
+        starred: false,
+        folder: 'drafts',
+        hasAttachments: false,
       });
     },
     [mailbox],
   );
+
+  // Signature handlers
+  const handleSaveSignature = useCallback((sig: EmailSignature) => {
+    setSignatures((prev) => {
+      const updated = prev.find((s) => s.id === sig.id)
+        ? prev.map((s) => (s.id === sig.id ? sig : s))
+        : [...prev, sig];
+      saveSignatures(updated);
+      return updated;
+    });
+  }, []);
+
+  const handleDeleteSignature = useCallback((id: string) => {
+    setSignatures((prev) => {
+      const updated = prev.filter((s) => s.id !== id);
+      saveSignatures(updated);
+      return updated;
+    });
+  }, []);
+
+  const handleSetDefaultSignature = useCallback((id: string) => {
+    setSignatures((prev) => {
+      const updated = prev.map((s) => ({ ...s, isDefault: s.id === id }));
+      saveSignatures(updated);
+      return updated;
+    });
+  }, []);
+
+  // Rules handlers
+  const handleSaveRule = useCallback((rule: EmailRule) => {
+    setRules((prev) => {
+      const updated = prev.find((r) => r.id === rule.id)
+        ? prev.map((r) => (r.id === rule.id ? rule : r))
+        : [...prev, rule];
+      saveRules(updated);
+      return updated;
+    });
+  }, []);
+
+  const handleDeleteRule = useCallback((id: string) => {
+    setRules((prev) => {
+      const updated = prev.filter((r) => r.id !== id);
+      saveRules(updated);
+      return updated;
+    });
+  }, []);
+
+  const handleToggleRule = useCallback((id: string) => {
+    setRules((prev) => {
+      const updated = prev.map((r) =>
+        r.id === id ? { ...r, enabled: !r.enabled } : r
+      );
+      saveRules(updated);
+      return updated;
+    });
+  }, []);
+
+  // Contact handlers
+  const handleAddContact = useCallback((contact: Omit<Contact, 'id'>) => {
+    const newContact: Contact = { ...contact, id: `contact-${Date.now()}` };
+    setContacts((prev) => {
+      const updated = [...prev, newContact];
+      localStorage.setItem('eoffice-email-contacts', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const handleDeleteContact = useCallback((id: string) => {
+    setContacts((prev) => {
+      const updated = prev.filter((c) => c.id !== id);
+      localStorage.setItem('eoffice-email-contacts', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  // Search handler
+  const handleSearch = useCallback(async (filters: SearchFilters) => {
+    setIsSearching(true);
+    // Client-side search for now
+    const q = filters.query.toLowerCase();
+    const results = mailbox.messages.filter((m) => {
+      if (q && !m.from.toLowerCase().includes(q) && !m.subject.toLowerCase().includes(q) && !m.body.toLowerCase().includes(q)) return false;
+      if (filters.sender && !m.from.toLowerCase().includes(filters.sender.toLowerCase())) return false;
+      if (filters.dateFrom && m.date < filters.dateFrom) return false;
+      if (filters.dateTo && m.date > filters.dateTo) return false;
+      if (filters.folder && m.folder !== filters.folder) return false;
+      if (filters.hasAttachment && !m.hasAttachments) return false;
+      return true;
+    });
+    setSearchResults(results.length);
+    setIsSearching(false);
+  }, [mailbox.messages]);
+
+  // Folder management
+  const handleCreateFolder = useCallback((name: string) => {
+    mailbox.createFolder?.(name);
+  }, [mailbox]);
+
+  const handleRenameFolder = useCallback((_path: string, _newName: string) => {
+    // TODO: IMAP folder rename
+  }, []);
+
+  const handleDeleteFolder = useCallback((_path: string) => {
+    // TODO: IMAP folder delete
+  }, []);
+
+  // Bulk actions
+  const handleBulkDelete = useCallback((ids: string[]) => {
+    ids.forEach((id) => mailbox.deleteMessage(id));
+  }, [mailbox]);
+
+  const handleBulkMarkRead = useCallback((_ids: string[], _read: boolean) => {
+    _ids.forEach((id) => mailbox.markRead(id));
+  }, [mailbox]);
 
   const handleEBotAction = useCallback(
     async (action: string) => {
@@ -158,6 +337,8 @@ export default function App() {
     [ebot, mailbox.selectedEmail],
   );
 
+  const folderList = ['inbox', 'sent', 'drafts', 'spam', 'trash', 'archive'];
+
   return (
     <div className="email-app">
       <TopBar
@@ -173,21 +354,59 @@ export default function App() {
         onOpenAccountSetup={() => setAccountSetupOpen(true)}
         onRefresh={mailbox.refreshInbox}
         loading={mailbox.loading}
+        onOpenSignatures={() => setSignatureEditorOpen(true)}
+        onOpenRules={() => setRulesEditorOpen(true)}
+        onToggleContacts={() => setSidePanel(sidePanel === 'contacts' ? 'none' : 'contacts')}
+        onToggleSearch={() => setSidePanel(sidePanel === 'search' ? 'none' : 'search')}
       />
+
       <div className="email-body">
-        <InboxList
-          emails={mailbox.folderMessages}
-          selectedId={mailbox.selectedId}
-          onSelect={mailbox.selectEmail}
-          onToggleStar={mailbox.toggleStar}
-          folderLabel={folderLabels[mailbox.currentFolder as keyof typeof folderLabels] || mailbox.currentFolder}
+        <FolderTree
+          folders={mailbox.imapFolders || []}
+          currentFolder={mailbox.currentFolder}
+          onFolderSelect={mailbox.setCurrentFolder}
+          onCreateFolder={handleCreateFolder}
+          onRenameFolder={handleRenameFolder}
+          onDeleteFolder={handleDeleteFolder}
         />
+
+        <div className="email-center">
+          {sidePanel === 'search' && (
+            <SearchBar
+              onSearch={handleSearch}
+              onClear={() => setSearchResults(null)}
+              folders={folderList}
+              isSearching={isSearching}
+              resultCount={searchResults}
+            />
+          )}
+          <InboxList
+            emails={mailbox.folderMessages}
+            selectedId={mailbox.selectedId}
+            onSelect={mailbox.selectEmail}
+            onToggleStar={mailbox.toggleStar}
+            folderLabel={mailbox.currentFolder.charAt(0).toUpperCase() + mailbox.currentFolder.slice(1)}
+            onBulkDelete={handleBulkDelete}
+            onBulkMarkRead={handleBulkMarkRead}
+          />
+        </div>
+
         <EmailViewer
           email={mailbox.selectedEmail}
           onReply={handleReply}
           onForward={handleForward}
           onDelete={mailbox.deleteMessage}
         />
+
+        {sidePanel === 'contacts' && (
+          <ContactsPanel
+            contacts={contacts}
+            onComposeToContact={handleComposeToContact}
+            onAddContact={handleAddContact}
+            onDeleteContact={handleDeleteContact}
+          />
+        )}
+
         <EBotSidebar
           open={ebotOpen}
           connected={ebot.connected}
@@ -197,20 +416,25 @@ export default function App() {
           onClose={() => setEbotOpen(false)}
         />
       </div>
+
       {composerOpen && (
         <EmailComposer
           initialTo={composerDefaults.to}
           initialSubject={composerDefaults.subject}
           initialBody={composerDefaults.body}
           onSend={handleSend}
+          onSaveDraft={handleSaveDraft}
           onClose={() => setComposerOpen(false)}
           onSpellCheck={ebot.connected ? ebot.spellCheck : undefined}
           onRewrite={ebot.connected ? ebot.rewriteText : undefined}
           onImprove={ebot.connected ? ebot.improveWriting : undefined}
           ebotConnected={ebot.connected}
           ebotLoading={ebot.loading}
+          signatures={signatures}
+          defaultSignature={getDefaultSignature()}
         />
       )}
+
       {accountSetupOpen && (
         <AccountSetup
           serverUrl={SERVER_URL}
@@ -220,10 +444,35 @@ export default function App() {
           }}
         />
       )}
+
+      {signatureEditorOpen && (
+        <SignatureEditor
+          signatures={signatures}
+          onSave={handleSaveSignature}
+          onDelete={handleDeleteSignature}
+          onSetDefault={handleSetDefaultSignature}
+          onClose={() => setSignatureEditorOpen(false)}
+        />
+      )}
+
+      {rulesEditorOpen && (
+        <RulesEditor
+          rules={rules}
+          onSave={handleSaveRule}
+          onDelete={handleDeleteRule}
+          onToggle={handleToggleRule}
+          onClose={() => setRulesEditorOpen(false)}
+          folders={folderList}
+        />
+      )}
+
       <StatusBar
         messageCount={mailbox.folderMessages.length}
         unreadCount={mailbox.unreadCount}
         connected={ebot.connected}
+        currentFolder={mailbox.currentFolder}
+        serverOnline={mailbox.serverOnline}
+        accountEmail={mailbox.account?.email}
       />
     </div>
   );

@@ -3,6 +3,9 @@ interface TopBarProps {
   onTitleChange: (title: string) => void;
   previewMode: boolean;
   onTogglePreview: () => void;
+  showResponses: boolean;
+  onToggleResponses: () => void;
+  responseCount: number;
   ebotSidebarOpen: boolean;
   onToggleEBot: () => void;
   connected: boolean;
@@ -13,6 +16,9 @@ export default function TopBar({
   onTitleChange,
   previewMode,
   onTogglePreview,
+  showResponses,
+  onToggleResponses,
+  responseCount,
   ebotSidebarOpen,
   onToggleEBot,
   connected,
@@ -38,6 +44,12 @@ export default function TopBar({
             onClick={onTogglePreview}
           >
             {previewMode ? '✏️ Edit' : '👁 Preview'}
+          </button>
+          <button
+            className={`topbar-action-btn ${showResponses ? 'active' : ''}`}
+            onClick={onToggleResponses}
+          >
+            📊 Responses ({responseCount})
           </button>
         </div>
         <div className={`topbar-status ${connected ? 'connected' : 'disconnected'}`}>

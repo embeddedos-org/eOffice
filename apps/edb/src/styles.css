@@ -702,3 +702,139 @@ body {
     box-shadow: var(--shadow-md);
   }
 }
+
+/* === View Switcher === */
+.topbar-center { flex: 1; display: flex; justify-content: center; padding: 0 16px; }
+.topbar-view-switcher { display: flex; gap: 2px; background: rgba(0,0,0,0.2); border-radius: var(--radius-sm); padding: 2px; }
+.topbar-view-btn {
+  padding: 3px 10px; border: none; border-radius: 3px;
+  background: transparent; color: rgba(255,255,255,0.7);
+  font-size: 11px; cursor: pointer; font-family: var(--font-sans);
+}
+.topbar-view-btn:hover { background: rgba(255,255,255,0.1); color: var(--text-inverse); }
+.topbar-view-btn.active { background: rgba(255,255,255,0.2); color: var(--text-inverse); font-weight: 600; }
+
+/* === ERD View === */
+.erd-view {
+  flex: 1; display: flex; flex-direction: column; overflow: auto;
+  padding: 24px; background: var(--bg-secondary);
+}
+.erd-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-primary); }
+.erd-canvas { position: relative; flex: 1; min-height: 400px; }
+.erd-lines { position: absolute; top: 0; left: 0; pointer-events: none; }
+.erd-tables { display: grid; gap: 40px 60px; position: relative; z-index: 1; }
+.erd-table-card {
+  background: var(--bg-primary); border: 2px solid var(--border-color);
+  border-radius: var(--radius-md); overflow: hidden; cursor: pointer;
+  box-shadow: var(--shadow-sm); transition: border-color 0.15s, box-shadow 0.15s;
+}
+.erd-table-card:hover { border-color: var(--accent); box-shadow: var(--shadow-md); }
+.erd-table-header {
+  display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+  background: var(--accent); color: var(--text-inverse); font-size: 13px; font-weight: 600;
+}
+.erd-table-cols { padding: 4px 0; }
+.erd-col {
+  display: flex; justify-content: space-between; padding: 3px 12px;
+  font-size: 12px; border-bottom: 1px solid var(--border-light);
+}
+.erd-col:last-child { border-bottom: none; }
+.erd-col-name { color: var(--text-primary); }
+.erd-col-type { color: var(--text-tertiary); font-size: 11px; font-family: var(--font-mono); }
+.erd-table-footer {
+  padding: 4px 12px; font-size: 11px; color: var(--text-tertiary);
+  background: var(--bg-tertiary); text-align: right;
+}
+.erd-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; flex: 1; color: var(--text-tertiary); gap: 8px;
+}
+.erd-legend {
+  margin-top: 16px; font-size: 12px; color: var(--text-secondary);
+  padding: 8px 12px; background: var(--bg-primary); border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+.erd-rel-badge { color: var(--accent); font-weight: 500; }
+
+/* === Form Entry === */
+.form-entry-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 200; display: flex; align-items: center; justify-content: center;
+}
+.form-entry {
+  width: 480px; max-height: 80vh; overflow-y: auto;
+  background: var(--bg-primary); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md); padding: 20px;
+}
+.form-entry-inline .form-entry-overlay { display: none; }
+.form-entry-inline .form-entry {
+  width: 100%; max-width: 560px; margin: 24px auto;
+  box-shadow: none; border: 1px solid var(--border-color);
+}
+.form-entry-inline { flex: 1; overflow-y: auto; padding: 24px; display: flex; justify-content: center; }
+.form-entry-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+}
+.form-entry-header h3 { font-size: 16px; font-weight: 600; }
+.form-entry-close {
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: var(--radius-sm); background: transparent;
+  color: var(--text-secondary); cursor: pointer; font-size: 16px;
+}
+.form-entry-close:hover { background: var(--bg-hover); }
+.form-entry-fields { display: flex; flex-direction: column; gap: 12px; }
+.form-entry-label {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+}
+.form-entry-col-name { display: flex; align-items: center; gap: 6px; }
+.form-entry-col-type {
+  font-size: 10px; color: var(--text-tertiary); font-weight: 400;
+  font-family: var(--font-mono);
+}
+.form-entry-label input {
+  padding: 6px 10px; border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm); font-size: 13px; font-family: var(--font-sans);
+  color: var(--text-primary); background: var(--bg-primary); outline: none;
+}
+.form-entry-label input:focus { border-color: var(--accent); }
+.form-entry-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.form-entry-btn {
+  padding: 6px 16px; border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;
+  cursor: pointer; background: var(--bg-primary); color: var(--text-primary);
+}
+.form-entry-btn:hover { background: var(--bg-hover); }
+.form-entry-btn.primary {
+  background: var(--accent); color: var(--text-inverse); border-color: var(--accent);
+}
+.form-entry-btn.primary:hover { background: var(--accent-hover); }
+
+/* === SQL Syntax Highlighting === */
+.query-input-wrapper {
+  position: relative; width: 100%; height: 80px;
+  border-bottom: 1px solid var(--border-color);
+}
+.query-highlight-layer, .query-textarea {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  padding: 8px 12px; font-family: var(--font-mono); font-size: 12px;
+  line-height: 1.5; white-space: pre-wrap; word-wrap: break-word;
+  overflow: auto; margin: 0; border: none;
+}
+.query-highlight-layer {
+  color: transparent; pointer-events: none; z-index: 1;
+  background: var(--bg-primary);
+}
+.query-textarea {
+  color: var(--text-primary); background: transparent; z-index: 2;
+  outline: none; resize: none; caret-color: var(--text-primary);
+  -webkit-text-fill-color: transparent;
+}
+.sql-keyword { color: #1d4ed8; font-weight: 600; -webkit-text-fill-color: #1d4ed8; }
+.sql-string { color: #15803d; -webkit-text-fill-color: #15803d; }
+.sql-number { color: #b45309; -webkit-text-fill-color: #b45309; }
+@media (prefers-color-scheme: dark) {
+  .sql-keyword { color: #93c5fd; -webkit-text-fill-color: #93c5fd; }
+  .sql-string { color: #86efac; -webkit-text-fill-color: #86efac; }
+  .sql-number { color: #fcd34d; -webkit-text-fill-color: #fcd34d; }
+}

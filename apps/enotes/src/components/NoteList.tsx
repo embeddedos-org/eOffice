@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
-import type { Note } from '../App';
+import type { Note, Notebook } from '../App';
 
 interface NoteListProps {
   notes: Note[];
+  notebooks: Notebook[];
   selectedNoteId: string | null;
+  selectedSectionId: string | null;
   searchQuery: string;
+  sortBy: 'date' | 'title' | 'modified';
+  onSortChange: (sort: 'date' | 'title' | 'modified') => void;
   onSearchChange: (query: string) => void;
   onSelectNote: (id: string) => void;
+  onSelectSection: (id: string | null) => void;
   onCreateNote: () => void;
   onDeleteNote: (id: string) => void;
   onTogglePin: (id: string) => void;
+  onAddNotebook: (name: string) => void;
+  onAddSection: (notebookId: string, name: string) => void;
 }
 
 function formatDate(ts: number): string {
@@ -34,15 +41,34 @@ function getPreview(content: string, maxLen = 80): string {
 
 export default function NoteList({
   notes,
+  notebooks,
   selectedNoteId,
+  selectedSectionId,
   searchQuery,
+  sortBy,
+  onSortChange,
   onSearchChange,
   onSelectNote,
+  onSelectSection,
   onCreateNote,
   onDeleteNote,
   onTogglePin,
+  onAddNotebook,
+  onAddSection,
 }: NoteListProps) {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [expandedNotebooks, setExpandedNotebooks] = useState<Set<string>>(
+    new Set(notebooks.map((nb) => nb.id)),
+  );
+
+  const toggleNotebook = (id: string) => {
+    setExpandedNotebooks((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -60,13 +86,26 @@ export default function NoteList({
     onTogglePin(id);
   };
 
+  const handleAddNotebook = () => {
+    const name = prompt('Notebook name:');
+    if (name?.trim()) onAddNotebook(name.trim());
+  };
+
+  const handleAddSection = (e: React.MouseEvent, notebookId: string) => {
+    e.stopPropagation();
+    const name = prompt('Section name:');
+    if (name?.trim()) onAddSection(notebookId, name.trim());
+  };
+
   return (
     <aside className="note-list-panel">
       <div className="note-list-header">
         <h1 className="app-title">📝 eNotes</h1>
-        <button className="btn-new-note" onClick={onCreateNote} title="New Note">
-          +
-        </button>
+        <div className="note-list-header-actions">
+          <button className="btn-new-note" onClick={onCreateNote} title="New Note">
+            +
+          </button>
+        </div>
       </div>
 
       <div className="search-bar">
@@ -84,6 +123,63 @@ export default function NoteList({
         )}
       </div>
 
+      {/* Sort & Notebook controls */}
+      <div className="list-controls">
+        <select
+          className="sort-select"
+          value={sortBy}
+          onChange={(e) => onSortChange(e.target.value as 'date' | 'title' | 'modified')}
+        >
+          <option value="modified">Modified</option>
+          <option value="date">Created</option>
+          <option value="title">Title</option>
+        </select>
+        <button className="btn-icon" onClick={handleAddNotebook} title="New Notebook">
+          📓+
+        </button>
+        <button
+          className={`btn-icon ${!selectedSectionId ? 'active' : ''}`}
+          onClick={() => onSelectSection(null)}
+          title="All Notes"
+        >
+          All
+        </button>
+      </div>
+
+      {/* Notebook / Section Hierarchy */}
+      <div className="notebook-tree">
+        {notebooks.map((nb) => (
+          <div key={nb.id} className="notebook-item">
+            <div className="notebook-header" onClick={() => toggleNotebook(nb.id)}>
+              <span className="notebook-expand">{expandedNotebooks.has(nb.id) ? '▾' : '▸'}</span>
+              <span className="notebook-name">📓 {nb.name}</span>
+              <button
+                className="btn-icon btn-add-section"
+                onClick={(e) => handleAddSection(e, nb.id)}
+                title="Add Section"
+              >
+                +
+              </button>
+            </div>
+            {expandedNotebooks.has(nb.id) && (
+              <div className="section-list">
+                {nb.sections.map((sec) => (
+                  <div
+                    key={sec.id}
+                    className={`section-item ${selectedSectionId === sec.id ? 'active' : ''}`}
+                    onClick={() => onSelectSection(sec.id)}
+                  >
+                    <span className="section-color-dot" style={{ background: sec.color }} />
+                    <span className="section-name">{sec.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Note list */}
       <div className="note-list-scroll">
         {notes.length === 0 ? (
           <div className="note-list-empty">

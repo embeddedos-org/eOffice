@@ -1,10 +1,12 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import TopBar from './components/TopBar';
 import Toolbar from './components/Toolbar';
 import Editor from './components/Editor';
 import EBotSidebar from './components/EBotSidebar';
 import StatusBar from './components/StatusBar';
+import DocumentSidebar, { DocMeta, TEMPLATES } from './components/DocumentSidebar';
 import { useEBot } from './hooks/useEBot';
+import { exportToDocx, exportToPdf, exportToHtml, exportToMarkdown } from '@eoffice/core/src/file-export';
 
 interface FormatState {
   bold: boolean;
@@ -14,15 +16,38 @@ interface FormatState {
   list: boolean;
 }
 
+const STORAGE_KEY = 'edocs-documents';
+
+function loadDocuments(): DocMeta[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveDocuments(docs: DocMeta[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(docs));
+}
+
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
 export default function App() {
+  const [documents, setDocuments] = useState<DocMeta[]>(() => loadDocuments());
+  const [activeDocId, setActiveDocId] = useState<string | null>(null);
   const [content, setContent] = useState('');
   const [title, setTitle] = useState('Untitled Document');
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
   const [ebotSidebarOpen, setEbotSidebarOpen] = useState(false);
+  const [docSidebarOpen, setDocSidebarOpen] = useState(false);
   const [ebotResponse, setEbotResponse] = useState('');
   const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
   const [cursorPosition, setCursorPosition] = useState({ line: 1, col: 1 });
+  const [showFindReplace, setShowFindReplace] = useState(false);
   const [formatState, setFormatState] = useState<FormatState>({
     bold: false,
     italic: false,
@@ -33,8 +58,14 @@ export default function App() {
 
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const { connected: ebotConnected, loading: isLoading, summarize, rewrite, grammarCheck, translate } = useEBot();
+
+  // Persist documents to localStorage whenever they change
+  useEffect(() => {
+    saveDocuments(documents);
+  }, [documents]);
 
   const computeStats = useCallback((text: string) => {
     const trimmed = text.trim();
@@ -42,6 +73,16 @@ export default function App() {
     setWordCount(words);
     setCharCount(text.length);
   }, []);
+
+  const persistActiveDoc = useCallback(() => {
+    if (!activeDocId) return;
+    const htmlContent = editorRef.current?.innerHTML || '';
+    setDocuments((prev) =>
+      prev.map((d) =>
+        d.id === activeDocId ? { ...d, title, content: htmlContent, lastModified: Date.now() } : d
+      )
+    );
+  }, [activeDocId, title]);
 
   const handleContentChange = useCallback(
     (newContent: string) => {
@@ -52,10 +93,11 @@ export default function App() {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
       autoSaveTimer.current = setTimeout(() => {
         setAutoSaveStatus('saving');
+        persistActiveDoc();
         setTimeout(() => setAutoSaveStatus('saved'), 600);
       }, 1500);
     },
-    [computeStats]
+    [computeStats, persistActiveDoc]
   );
 
   const handleFormat = useCallback((command: string) => {
@@ -89,6 +131,147 @@ export default function App() {
     }
     editorRef.current?.focus();
   }, [formatState.heading]);
+
+  // Export handlers
+  const handleExport = useCallback(
+    (format: 'docx' | 'html' | 'md' | 'pdf') => {
+      const htmlContent = editorRef.current?.innerHTML || '';
+      switch (format) {
+        case 'docx':
+          exportToDocx(title, htmlContent);
+          break;
+        case 'html':
+          exportToHtml(title, htmlContent);
+          break;
+        case 'md':
+          exportToMarkdown(title, htmlContent);
+          break;
+        case 'pdf':
+          exportToPdf(title, htmlContent);
+          break;
+      }
+    },
+    [title]
+  );
+
+  // Table insertion
+  const handleInsertTable = useCallback((rows: number, cols: number) => {
+    let html = '<table class="editor-table"><tbody>';
+    for (let r = 0; r < rows; r++) {
+      html += '<tr>';
+      for (let c = 0; c < cols; c++) {
+        html += '<td>&nbsp;</td>';
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table><p><br></p>';
+    document.execCommand('insertHTML', false, html);
+    editorRef.current?.focus();
+  }, []);
+
+  // Image insertion via file picker
+  const handleInsertImage = useCallback(() => {
+    imageInputRef.current?.click();
+  }, []);
+
+  const handleImageSelected = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      document.execCommand(
+        'insertHTML',
+        false,
+        `<img src="${dataUrl}" style="max-width:100%;height:auto;margin:8px 0;border-radius:4px;" />`
+      );
+      editorRef.current?.focus();
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }, []);
+
+  // Find & Replace toggle
+  const handleFindReplace = useCallback(() => {
+    setShowFindReplace((prev) => !prev);
+  }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+        e.preventDefault();
+        setShowFindReplace((prev) => !prev);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault();
+        window.print();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Document management
+  const handleNewDocument = useCallback(
+    (templateId?: string) => {
+      // Save current doc first
+      persistActiveDoc();
+
+      const template = TEMPLATES.find((t) => t.id === templateId);
+      const newDoc: DocMeta = {
+        id: generateId(),
+        title: template ? `${template.label} Document` : 'Untitled Document',
+        content: template?.content || '',
+        lastModified: Date.now(),
+        template: templateId,
+      };
+      setDocuments((prev) => [...prev, newDoc]);
+      setActiveDocId(newDoc.id);
+      setTitle(newDoc.title);
+      if (editorRef.current) {
+        editorRef.current.innerHTML = newDoc.content;
+      }
+      setContent(editorRef.current?.innerText || '');
+      computeStats(editorRef.current?.innerText || '');
+      setAutoSaveStatus('saved');
+    },
+    [persistActiveDoc, computeStats]
+  );
+
+  const handleOpenDocument = useCallback(
+    (id: string) => {
+      persistActiveDoc();
+      const doc = documents.find((d) => d.id === id);
+      if (!doc) return;
+      setActiveDocId(doc.id);
+      setTitle(doc.title);
+      if (editorRef.current) {
+        editorRef.current.innerHTML = doc.content;
+      }
+      setContent(editorRef.current?.innerText || '');
+      computeStats(editorRef.current?.innerText || '');
+      setAutoSaveStatus('saved');
+    },
+    [documents, persistActiveDoc, computeStats]
+  );
+
+  const handleDeleteDocument = useCallback(
+    (id: string) => {
+      setDocuments((prev) => prev.filter((d) => d.id !== id));
+      if (activeDocId === id) {
+        setActiveDocId(null);
+        setTitle('Untitled Document');
+        if (editorRef.current) {
+          editorRef.current.innerHTML = '';
+        }
+        setContent('');
+        setWordCount(0);
+        setCharCount(0);
+      }
+    },
+    [activeDocId]
+  );
 
   const handleEBotAction = useCallback(
     async (action: string) => {
@@ -162,6 +345,8 @@ export default function App() {
         ebotSidebarOpen={ebotSidebarOpen}
         onToggleEBot={() => setEbotSidebarOpen((prev) => !prev)}
         connected={ebotConnected}
+        onToggleDocSidebar={() => setDocSidebarOpen((prev) => !prev)}
+        docSidebarOpen={docSidebarOpen}
       />
       <Toolbar
         formatState={formatState}
@@ -169,13 +354,28 @@ export default function App() {
         onHeading={handleHeading}
         onUndo={handleUndo}
         onRedo={handleRedo}
+        onExport={handleExport}
+        onInsertTable={handleInsertTable}
+        onInsertImage={handleInsertImage}
+        onFindReplace={handleFindReplace}
       />
       <div className="edocs-body">
+        <DocumentSidebar
+          open={docSidebarOpen}
+          documents={documents}
+          activeDocId={activeDocId}
+          onNewDocument={handleNewDocument}
+          onOpenDocument={handleOpenDocument}
+          onDeleteDocument={handleDeleteDocument}
+          onClose={() => setDocSidebarOpen(false)}
+        />
         <Editor
           ref={editorRef}
           content={content}
           onChange={handleContentChange}
           onCursorChange={handleCursorChange}
+          showFindReplace={showFindReplace}
+          onCloseFindReplace={() => setShowFindReplace(false)}
         />
         <EBotSidebar
           open={ebotSidebarOpen}
@@ -192,6 +392,14 @@ export default function App() {
         connected={ebotConnected}
         cursorPosition={cursorPosition}
         autoSaveStatus={autoSaveStatus}
+      />
+      {/* Hidden file input for image insertion */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleImageSelected}
       />
     </div>
   );

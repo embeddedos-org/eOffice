@@ -6,6 +6,8 @@ interface TopBarProps {
   ebotSidebarOpen: boolean;
   onToggleEBot: () => void;
   connected: boolean;
+  onToggleDocSidebar: () => void;
+  docSidebarOpen: boolean;
 }
 
 export default function TopBar({
@@ -14,10 +16,20 @@ export default function TopBar({
   ebotSidebarOpen,
   onToggleEBot,
   connected,
+  onToggleDocSidebar,
+  docSidebarOpen,
 }: TopBarProps) {
   return (
     <header className="topbar">
       <div className="topbar-left">
+        <button
+          className={`topbar-docs-btn ${docSidebarOpen ? 'active' : ''}`}
+          onClick={onToggleDocSidebar}
+          title="Toggle Documents Panel"
+          aria-label="Toggle documents sidebar"
+        >
+          ☰
+        </button>
         <span className="topbar-logo">📝</span>
         <h1 className="topbar-title">eDocs</h1>
       </div>

@@ -6,9 +6,10 @@ interface TableViewProps {
   onInsertRow: (tableId: string) => void;
   onUpdateRow: (tableId: string, rowIdx: number, col: string, value: string) => void;
   onDeleteRow: (tableId: string, rowIdx: number) => void;
+  onFormEntry?: () => void;
 }
 
-export default function TableView({ table, onInsertRow, onUpdateRow, onDeleteRow }: TableViewProps) {
+export default function TableView({ table, onInsertRow, onUpdateRow, onDeleteRow, onFormEntry }: TableViewProps) {
   const [editCell, setEditCell] = useState<{ row: number; col: string } | null>(null);
   const [editValue, setEditValue] = useState('');
 
@@ -37,6 +38,7 @@ export default function TableView({ table, onInsertRow, onUpdateRow, onDeleteRow
     <div className="table-view">
       <div className="table-view-toolbar">
         <button onClick={() => onInsertRow(table.id)}>➕ Add Row</button>
+        {onFormEntry && <button onClick={onFormEntry}>📝 Form Entry</button>}
         <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
           {table.name} — {table.rows.length} rows, {table.columns.length} columns
         </span>

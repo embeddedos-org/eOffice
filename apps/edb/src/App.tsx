@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import TopBar from './components/TopBar';
+import type { DBView } from './components/TopBar';
 import TableList from './components/TableList';
 import TableView from './components/TableView';
 import QueryEditor from './components/QueryEditor';
+import ERDView from './components/ERDView';
+import FormEntry from './components/FormEntry';
 import EBotSidebar from './components/EBotSidebar';
 import StatusBar from './components/StatusBar';
 import { useDatabase } from './hooks/useDatabase';
@@ -10,12 +13,26 @@ import { useEBot } from './hooks/useEBot';
 
 export default function App() {
   const [ebotOpen, setEbotOpen] = useState(false);
+  const [currentView, setCurrentView] = useState<DBView>('table');
+  const [showFormEntry, setShowFormEntry] = useState(false);
   const db = useDatabase();
   const ebot = useEBot();
 
   const handleNewTable = () => {
     const name = prompt('Table name:');
     if (name?.trim()) db.createTable(name.trim());
+  };
+
+  const handleImportCSV = (csv: string) => {
+    if (!db.selectedTableId) {
+      alert('Select a table first to import CSV data into.');
+      return;
+    }
+    db.importCSV(db.selectedTableId, csv);
+  };
+
+  const handleFormInsert = (tableId: string, row: Record<string, string>) => {
+    db.insertRow(tableId, row);
   };
 
   return (
@@ -25,6 +42,9 @@ export default function App() {
         ebotOpen={ebotOpen}
         onToggleEBot={() => setEbotOpen((p) => !p)}
         connected={ebot.connected}
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        onImportCSV={handleImportCSV}
       />
       <div className="edb-body">
         <TableList
@@ -35,13 +55,38 @@ export default function App() {
           onDrop={db.dropTable}
         />
         <div className="edb-main">
-          <TableView
-            table={db.selectedTable}
-            onInsertRow={db.insertRow}
-            onUpdateRow={db.updateRow}
-            onDeleteRow={db.deleteRow}
-          />
-          <QueryEditor tables={db.tables} />
+          {currentView === 'erd' ? (
+            <ERDView
+              tables={db.tables}
+              onSelectTable={(id) => { db.setSelectedTableId(id); setCurrentView('table'); }}
+            />
+          ) : currentView === 'form' ? (
+            db.selectedTable ? (
+              <div className="form-entry-inline">
+                <FormEntry
+                  table={db.selectedTable}
+                  onInsertRow={handleFormInsert}
+                  onClose={() => setCurrentView('table')}
+                />
+              </div>
+            ) : (
+              <div className="table-empty">
+                <div className="table-empty-icon">📝</div>
+                <div>Select a table to use form entry</div>
+              </div>
+            )
+          ) : (
+            <>
+              <TableView
+                table={db.selectedTable}
+                onInsertRow={(id) => db.insertRow(id)}
+                onUpdateRow={db.updateRow}
+                onDeleteRow={db.deleteRow}
+                onFormEntry={() => setShowFormEntry(true)}
+              />
+              <QueryEditor tables={db.tables} />
+            </>
+          )}
         </div>
         <EBotSidebar
           open={ebotOpen}
@@ -52,6 +97,13 @@ export default function App() {
           onExplainQuery={ebot.explainQuery}
         />
       </div>
+      {showFormEntry && db.selectedTable && (
+        <FormEntry
+          table={db.selectedTable}
+          onInsertRow={handleFormInsert}
+          onClose={() => setShowFormEntry(false)}
+        />
+      )}
       <StatusBar
         tableCount={db.tables.length}
         rowCount={db.totalRows}

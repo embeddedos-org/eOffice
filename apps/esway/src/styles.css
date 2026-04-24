@@ -361,3 +361,93 @@ body {
 @media (max-width: 768px) {
   .ebot-sidebar.open { position: absolute; right: 0; top: 0; bottom: 0; z-index: 50; box-shadow: var(--shadow-md); }
 }
+
+/* === Template Gallery === */
+.template-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  z-index: 200; display: flex; align-items: center; justify-content: center;
+}
+.template-gallery {
+  width: 640px; max-height: 80vh; background: var(--bg-primary);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-md);
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.template-gallery-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--border-color);
+}
+.template-gallery-header h3 { font-size: 16px; font-weight: 600; }
+.template-close {
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: var(--radius-sm); background: transparent;
+  color: var(--text-secondary); cursor: pointer; font-size: 16px;
+}
+.template-close:hover { background: var(--bg-hover); }
+.template-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px; padding: 20px; overflow-y: auto;
+}
+.template-card {
+  padding: 16px; border: 1px solid var(--border-color); border-radius: var(--radius-md);
+  cursor: pointer; text-align: center; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.template-card:hover { border-color: var(--accent); box-shadow: var(--shadow-sm); }
+.template-card-icon { font-size: 28px; margin-bottom: 6px; }
+.template-card-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.template-card-desc { font-size: 11px; color: var(--text-tertiary); margin-bottom: 6px; }
+.template-type-badge {
+  font-size: 9px; padding: 1px 5px; border-radius: 3px;
+  font-weight: 600; text-transform: uppercase;
+}
+.template-type-badge.quiz { background: #dbeafe; color: #1d4ed8; }
+.template-type-badge.poll { background: #dcfce7; color: #15803d; }
+.template-type-badge.qa { background: #fef3c7; color: #b45309; }
+
+/* === Timer === */
+.canvas-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.canvas-timer-section { display: flex; align-items: center; }
+.canvas-timer {
+  font-size: 18px; font-weight: 700; color: var(--accent);
+  padding: 4px 12px; background: var(--accent-light); border-radius: var(--radius-sm);
+}
+.canvas-timer.urgent { color: var(--error); background: #fef2f2; animation: pulse 0.5s infinite alternate; }
+@keyframes pulse { from { opacity: 1; } to { opacity: 0.5; } }
+.canvas-timer-btn {
+  padding: 4px 12px; border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+  background: var(--bg-primary); color: var(--text-primary); font-size: 12px; cursor: pointer;
+}
+.canvas-timer-btn:hover { background: var(--bg-hover); border-color: var(--accent); }
+
+/* === Quiz Scoring === */
+.canvas-option.correct { background: #dcfce7; border-color: #22c55e; }
+.canvas-option.incorrect { background: #fef2f2; border-color: var(--error); }
+.canvas-correct-mark { margin-left: auto; color: #22c55e; font-weight: 700; font-size: 16px; }
+.canvas-score {
+  margin-top: 16px; padding: 8px 16px; background: var(--accent-light);
+  border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; color: var(--accent);
+  text-align: center;
+}
+
+/* === Media Embed === */
+.canvas-media {
+  margin-bottom: 16px; padding: 20px; background: var(--bg-tertiary);
+  border-radius: var(--radius-sm); text-align: center;
+}
+.canvas-media-placeholder { font-size: 13px; color: var(--text-secondary); }
+
+/* === Slide Delete === */
+.slide-item-delete {
+  display: none; width: 18px; height: 18px; border: none; border-radius: var(--radius-sm);
+  background: transparent; color: var(--error); font-size: 11px; cursor: pointer;
+  align-items: center; justify-content: center; flex-shrink: 0;
+}
+.slide-item:hover .slide-item-delete { display: flex; }
+.slide-item-delete:hover { background: rgba(234,67,53,0.1); }
+.slide-item-media { font-size: 10px; color: var(--text-tertiary); }
+
+/* === Share Banner === */
+.share-banner {
+  padding: 6px 16px; background: var(--accent-light); border-top: 1px solid var(--accent);
+  font-size: 12px; color: var(--text-primary); text-align: center;
+}
+.share-link { font-family: var(--font-mono); color: var(--accent); font-weight: 500; }

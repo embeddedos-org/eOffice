@@ -5,9 +5,10 @@ interface SlideListProps {
   currentSlideId: string;
   onSelect: (id: string) => void;
   onAdd: () => void;
+  onRemove: (id: string) => void;
 }
 
-export default function SlideList({ slides, currentSlideId, onSelect, onAdd }: SlideListProps) {
+export default function SlideList({ slides, currentSlideId, onSelect, onAdd, onRemove }: SlideListProps) {
   return (
     <div className="slide-list">
       <div className="slide-list-header">
@@ -24,8 +25,16 @@ export default function SlideList({ slides, currentSlideId, onSelect, onAdd }: S
             <div className="slide-item-number">{i + 1}</div>
             <div className="slide-item-info">
               <div className="slide-item-title">{slide.question}</div>
+              {slide.mediaUrl && <div className="slide-item-media">🖼️ Media</div>}
             </div>
             <span className={`slide-type-badge ${slide.type}`}>{slide.type}</span>
+            <button
+              className="slide-item-delete"
+              onClick={(e) => { e.stopPropagation(); onRemove(slide.id); }}
+              title="Remove slide"
+            >
+              ✕
+            </button>
           </div>
         ))}
       </div>

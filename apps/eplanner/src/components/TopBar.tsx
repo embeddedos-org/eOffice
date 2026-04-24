@@ -1,6 +1,10 @@
+export type PlannerView = 'board' | 'calendar' | 'gantt';
+
 interface TopBarProps {
   boardName: string;
   onBoardNameChange: (name: string) => void;
+  currentView: PlannerView;
+  onViewChange: (view: PlannerView) => void;
   ebotSidebarOpen: boolean;
   onToggleEBot: () => void;
   connected: boolean;
@@ -10,6 +14,8 @@ interface TopBarProps {
 export default function TopBar({
   boardName,
   onBoardNameChange,
+  currentView,
+  onViewChange,
   ebotSidebarOpen,
   onToggleEBot,
   connected,
@@ -30,6 +36,17 @@ export default function TopBar({
         />
       </div>
       <div className="topbar-right">
+        <div className="topbar-view-switcher">
+          <button className={`topbar-view-btn ${currentView === 'board' ? 'active' : ''}`} onClick={() => onViewChange('board')}>
+            📋 Board
+          </button>
+          <button className={`topbar-view-btn ${currentView === 'calendar' ? 'active' : ''}`} onClick={() => onViewChange('calendar')}>
+            📅 Calendar
+          </button>
+          <button className={`topbar-view-btn ${currentView === 'gantt' ? 'active' : ''}`} onClick={() => onViewChange('gantt')}>
+            📊 Gantt
+          </button>
+        </div>
         <div className="topbar-actions">
           <button className="topbar-action-btn" onClick={onAddTask}>
             ＋ Add Task

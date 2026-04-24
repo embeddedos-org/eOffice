@@ -3,6 +3,7 @@ import TopBar from './components/TopBar';
 import FormBuilder from './components/FormBuilder';
 import FieldEditor from './components/FieldEditor';
 import FormPreview from './components/FormPreview';
+import ResponsesView from './components/ResponsesView';
 import EBotSidebar from './components/EBotSidebar';
 import StatusBar from './components/StatusBar';
 import { useFormBuilder } from './hooks/useFormBuilder';
@@ -12,6 +13,7 @@ export default function App() {
   const [title, setTitle] = useState('Untitled Form');
   const [ebotOpen, setEbotOpen] = useState(false);
   const [ebotResponse, setEbotResponse] = useState('');
+  const [showResponses, setShowResponses] = useState(false);
 
   const form = useFormBuilder();
   const { connected, loading, suggestFields, improveQuestion } = useEBot();
@@ -68,14 +70,28 @@ export default function App() {
         title={title}
         onTitleChange={setTitle}
         previewMode={form.previewMode}
-        onTogglePreview={() => form.setPreviewMode((p) => !p)}
+        onTogglePreview={() => { form.setPreviewMode((p) => !p); setShowResponses(false); }}
+        showResponses={showResponses}
+        onToggleResponses={() => { setShowResponses((p) => !p); form.setPreviewMode(false); }}
+        responseCount={form.responses.length}
         ebotSidebarOpen={ebotOpen}
         onToggleEBot={() => setEbotOpen((p) => !p)}
         connected={connected}
       />
       <div className="eforms-body">
-        {form.previewMode ? (
-          <FormPreview title={title} fields={form.fields} />
+        {showResponses ? (
+          <ResponsesView
+            fields={form.fields}
+            responses={form.responses}
+            onExportCSV={form.exportResponsesCSV}
+          />
+        ) : form.previewMode ? (
+          <FormPreview
+            title={title}
+            fields={form.fields}
+            shouldShowField={form.shouldShowField}
+            onSubmit={form.submitResponse}
+          />
         ) : (
           <>
             <FormBuilder
@@ -86,7 +102,11 @@ export default function App() {
               onRemoveField={form.removeField}
             />
             {form.selectedField && (
-              <FieldEditor field={form.selectedField} onUpdate={form.updateField} />
+              <FieldEditor
+                field={form.selectedField}
+                fields={form.fields}
+                onUpdate={form.updateField}
+              />
             )}
           </>
         )}

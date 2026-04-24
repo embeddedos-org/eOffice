@@ -1,20 +1,23 @@
 import { useState, useEffect } from 'react';
-import type { Task, TaskStatus, TaskPriority } from '../hooks/usePlanner';
+import type { Task, TaskPriority, KanbanColumn } from '../hooks/usePlanner';
 
 interface TaskDetailProps {
   task: Task;
+  columns: KanbanColumn[];
+  teamMembers: string[];
   onUpdate: (id: string, updates: Partial<Task>) => void;
   onRemove: (id: string) => void;
   onClose: () => void;
 }
 
-export default function TaskDetail({ task, onUpdate, onRemove, onClose }: TaskDetailProps) {
+export default function TaskDetail({ task, columns, teamMembers, onUpdate, onRemove, onClose }: TaskDetailProps) {
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
-  const [status, setStatus] = useState<TaskStatus>(task.status);
+  const [status, setStatus] = useState(task.status);
   const [priority, setPriority] = useState<TaskPriority>(task.priority);
   const [dueDate, setDueDate] = useState(task.dueDate);
   const [tagsInput, setTagsInput] = useState(task.tags.join(', '));
+  const [assignee, setAssignee] = useState(task.assignee || '');
 
   useEffect(() => {
     setTitle(task.title);
@@ -23,6 +26,7 @@ export default function TaskDetail({ task, onUpdate, onRemove, onClose }: TaskDe
     setPriority(task.priority);
     setDueDate(task.dueDate);
     setTagsInput(task.tags.join(', '));
+    setAssignee(task.assignee || '');
   }, [task]);
 
   const handleSave = () => {
@@ -33,6 +37,7 @@ export default function TaskDetail({ task, onUpdate, onRemove, onClose }: TaskDe
       priority,
       dueDate,
       tags: tagsInput.split(',').map((t) => t.trim()).filter(Boolean),
+      assignee: assignee || undefined,
     });
     onClose();
   };
@@ -58,10 +63,10 @@ export default function TaskDetail({ task, onUpdate, onRemove, onClose }: TaskDe
         <div className="task-detail-row">
           <label>
             Status
-            <select value={status} onChange={(e) => setStatus(e.target.value as TaskStatus)}>
-              <option value="todo">To Do</option>
-              <option value="in-progress">In Progress</option>
-              <option value="done">Done</option>
+            <select value={status} onChange={(e) => setStatus(e.target.value)}>
+              {columns.map((col) => (
+                <option key={col.id} value={col.label}>{col.label}</option>
+              ))}
             </select>
           </label>
           <label>
@@ -74,10 +79,21 @@ export default function TaskDetail({ task, onUpdate, onRemove, onClose }: TaskDe
           </label>
         </div>
 
-        <label>
-          Due Date
-          <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-        </label>
+        <div className="task-detail-row">
+          <label>
+            Due Date
+            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </label>
+          <label>
+            Assignee
+            <select value={assignee} onChange={(e) => setAssignee(e.target.value)}>
+              <option value="">Unassigned</option>
+              {teamMembers.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </label>
+        </div>
 
         <label>
           Tags (comma-separated)

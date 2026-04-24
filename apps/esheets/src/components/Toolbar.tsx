@@ -3,11 +3,31 @@ import type { CellFormat } from '@eoffice/core';
 interface ToolbarProps {
   cellFormat: CellFormat;
   onFormatChange: (format: Partial<CellFormat>) => void;
+  onInsertChart: () => void;
+  onMergeCells: () => void;
+  onUnmergeCells: () => void;
+  onToggleFreezeRows: () => void;
+  onToggleFreezeCols: () => void;
+  frozenRows: number;
+  frozenCols: number;
+  hasSelection: boolean;
 }
 
-export default function Toolbar({ cellFormat, onFormatChange }: ToolbarProps) {
+export default function Toolbar({
+  cellFormat,
+  onFormatChange,
+  onInsertChart,
+  onMergeCells,
+  onUnmergeCells,
+  onToggleFreezeRows,
+  onToggleFreezeCols,
+  frozenRows,
+  frozenCols,
+  hasSelection,
+}: ToolbarProps) {
   return (
     <div className="toolbar">
+      {/* Format group */}
       <div className="toolbar-group">
         <button
           className={`toolbar-btn fmt-bold ${cellFormat.bold ? 'active' : ''}`}
@@ -32,6 +52,8 @@ export default function Toolbar({ cellFormat, onFormatChange }: ToolbarProps) {
         </button>
       </div>
       <div className="toolbar-divider" />
+
+      {/* Alignment group */}
       <div className="toolbar-group">
         <button
           className={`toolbar-btn ${cellFormat.align === 'left' ? 'active' : ''}`}
@@ -56,6 +78,8 @@ export default function Toolbar({ cellFormat, onFormatChange }: ToolbarProps) {
         </button>
       </div>
       <div className="toolbar-divider" />
+
+      {/* Number format group */}
       <div className="toolbar-group">
         <select
           className="toolbar-select"
@@ -75,6 +99,8 @@ export default function Toolbar({ cellFormat, onFormatChange }: ToolbarProps) {
         </select>
       </div>
       <div className="toolbar-divider" />
+
+      {/* Color group */}
       <div className="toolbar-group">
         <label title="Text Color" style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
           <span style={{ fontSize: 13, marginRight: 2, color: cellFormat.color || 'var(--text-secondary)' }}>A</span>
@@ -94,6 +120,57 @@ export default function Toolbar({ cellFormat, onFormatChange }: ToolbarProps) {
             style={{ width: 16, height: 16, border: 'none', cursor: 'pointer', padding: 0 }}
           />
         </label>
+      </div>
+      <div className="toolbar-divider" />
+
+      {/* Merge group */}
+      <div className="toolbar-group">
+        <button
+          className="toolbar-btn"
+          onClick={onMergeCells}
+          disabled={!hasSelection}
+          title="Merge Cells"
+        >
+          ⊞
+        </button>
+        <button
+          className="toolbar-btn"
+          onClick={onUnmergeCells}
+          title="Unmerge Cells"
+        >
+          ⊟
+        </button>
+      </div>
+      <div className="toolbar-divider" />
+
+      {/* Freeze panes group */}
+      <div className="toolbar-group">
+        <button
+          className={`toolbar-btn ${frozenRows > 0 ? 'active' : ''}`}
+          onClick={onToggleFreezeRows}
+          title="Freeze Top Row"
+        >
+          ❄R
+        </button>
+        <button
+          className={`toolbar-btn ${frozenCols > 0 ? 'active' : ''}`}
+          onClick={onToggleFreezeCols}
+          title="Freeze First Column"
+        >
+          ❄C
+        </button>
+      </div>
+      <div className="toolbar-divider" />
+
+      {/* Insert chart */}
+      <div className="toolbar-group">
+        <button
+          className="toolbar-btn toolbar-btn-chart"
+          onClick={onInsertChart}
+          title="Insert Chart"
+        >
+          📊
+        </button>
       </div>
     </div>
   );

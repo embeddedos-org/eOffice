@@ -1,6 +1,9 @@
 import { useState, useCallback } from 'react';
 import TopBar from './components/TopBar';
+import type { PlannerView } from './components/TopBar';
 import BoardView from './components/BoardView';
+import CalendarView from './components/CalendarView';
+import GanttView from './components/GanttView';
 import TaskDetail from './components/TaskDetail';
 import EBotSidebar from './components/EBotSidebar';
 import StatusBar from './components/StatusBar';
@@ -9,6 +12,7 @@ import { useEBot } from './hooks/useEBot';
 
 export default function App() {
   const [boardName, setBoardName] = useState('My Project Board');
+  const [currentView, setCurrentView] = useState<PlannerView>('board');
   const [ebotOpen, setEbotOpen] = useState(false);
   const [ebotResponse, setEbotResponse] = useState('');
 
@@ -19,11 +23,16 @@ export default function App() {
     planner.addTask({
       title: 'New Task',
       description: '',
-      status: 'todo',
+      status: planner.columns[0]?.label ?? 'To Do',
       priority: 'medium',
       dueDate: '',
       tags: [],
     });
+  }, [planner]);
+
+  const handleAddColumn = useCallback(() => {
+    const name = prompt('Column name:');
+    if (name?.trim()) planner.addColumn(name.trim());
   }, [planner]);
 
   const handleEBotAction = useCallback(
@@ -42,7 +51,7 @@ export default function App() {
           }
           case 'prioritize': {
             const todoTasks = planner.tasks
-              .filter((t) => t.status !== 'done')
+              .filter((t) => t.status !== 'Done')
               .map((t) => t.title)
               .join('\n');
             if (!todoTasks) {
@@ -75,18 +84,29 @@ export default function App() {
       <TopBar
         boardName={boardName}
         onBoardNameChange={setBoardName}
+        currentView={currentView}
+        onViewChange={setCurrentView}
         ebotSidebarOpen={ebotOpen}
         onToggleEBot={() => setEbotOpen((p) => !p)}
         connected={connected}
         onAddTask={handleAddTask}
       />
       <div className="eplanner-body">
-        <BoardView
-          tasks={planner.tasks}
-          filterByStatus={planner.filterByStatus}
-          onSelectTask={planner.setSelectedTaskId}
-          onMoveTask={planner.moveTask}
-        />
+        {currentView === 'calendar' ? (
+          <CalendarView tasks={planner.tasks} onSelectTask={planner.setSelectedTaskId} />
+        ) : currentView === 'gantt' ? (
+          <GanttView tasks={planner.tasks} onSelectTask={planner.setSelectedTaskId} />
+        ) : (
+          <BoardView
+            tasks={planner.tasks}
+            columns={planner.columns}
+            filterByStatus={planner.filterByStatus}
+            onSelectTask={planner.setSelectedTaskId}
+            onMoveTask={planner.moveTask}
+            onAddColumn={handleAddColumn}
+            onRemoveColumn={planner.removeColumn}
+          />
+        )}
         <EBotSidebar
           open={ebotOpen}
           connected={connected}
@@ -99,6 +119,8 @@ export default function App() {
       {planner.selectedTask && (
         <TaskDetail
           task={planner.selectedTask}
+          columns={planner.columns}
+          teamMembers={planner.teamMembers}
           onUpdate={planner.updateTask}
           onRemove={planner.removeTask}
           onClose={() => planner.setSelectedTaskId(null)}

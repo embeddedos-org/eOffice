@@ -5,21 +5,35 @@ import SlideList from './components/SlideList';
 import SlideCanvas from './components/SlideCanvas';
 import EBotSidebar from './components/EBotSidebar';
 import StatusBar from './components/StatusBar';
+import PresenterView from './components/PresenterView';
 import { usePresentation } from './hooks/usePresentation';
 import { useEBot } from './hooks/useEBot';
+import { exportToPptx } from '../../../packages/core/src/file-export';
 
 export default function App() {
   const [title, setTitle] = useState('Untitled Presentation');
   const [ebotOpen, setEbotOpen] = useState(false);
   const [ebotResponse, setEbotResponse] = useState('');
   const [theme, setTheme] = useState('Default');
+  const [presenting, setPresenting] = useState(false);
 
   const pres = usePresentation();
   const { connected, loading, suggestContent, generateTalkingPoints } = useEBot();
 
   const handlePresent = useCallback(() => {
-    alert(`Presenting "${title}" — ${pres.slides.length} slides (presentation mode coming soon)`);
-  }, [title, pres.slides.length]);
+    setPresenting(true);
+  }, []);
+
+  const handleExport = useCallback(() => {
+    const slideData = pres.slides.map((s, i) => ({
+      title: s.elements.find((e) => e.type === 'text')?.content || `Slide ${i + 1}`,
+      content: s.elements
+        .filter((e) => e.type === 'text')
+        .map((e) => e.content)
+        .join('\n'),
+    }));
+    exportToPptx(title, slideData);
+  }, [title, pres.slides]);
 
   const handleDeleteElement = useCallback(() => {
     if (pres.selectedElementId) pres.removeElement(pres.selectedElementId);
@@ -73,6 +87,16 @@ export default function App() {
     [connected, suggestContent, generateTalkingPoints, pres.currentSlide],
   );
 
+  if (presenting) {
+    return (
+      <PresenterView
+        slides={pres.slides}
+        startIndex={pres.currentIndex}
+        onExit={() => setPresenting(false)}
+      />
+    );
+  }
+
   return (
     <div className="eslides-app">
       <TopBar
@@ -82,14 +106,20 @@ export default function App() {
         onToggleEBot={() => setEbotOpen((p) => !p)}
         connected={connected}
         onPresent={handlePresent}
+        onExport={handleExport}
       />
       <Toolbar
         onInsertText={() => pres.addElement('text', 'Click to edit')}
-        onInsertShape={() => pres.addElement('shape', '')}
+        onInsertShape={(shapeType) => pres.addElement('shape', '', { shapeType })}
+        onInsertImage={(src) => pres.addElement('image', 'Image', { src })}
         onDeleteElement={handleDeleteElement}
         hasSelection={!!pres.selectedElementId}
         theme={theme}
         onThemeChange={setTheme}
+        background={pres.currentSlide.background || '#ffffff'}
+        onBackgroundChange={(bg) => pres.updateSlideProps({ background: bg })}
+        transition={pres.currentSlide.transition || 'none'}
+        onTransitionChange={(t) => pres.updateSlideProps({ transition: t })}
       />
       <div className="eslides-body">
         <SlideList
@@ -106,6 +136,7 @@ export default function App() {
           onSelectElement={pres.setSelectedElementId}
           onUpdateElement={pres.updateElement}
           onAddElement={pres.addElement}
+          onUpdateSlideProps={pres.updateSlideProps}
         />
         <EBotSidebar
           open={ebotOpen}

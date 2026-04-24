@@ -3,6 +3,7 @@ interface StatusBarProps {
   sheetCount: number;
   connected: boolean;
   selectionStats: { sum: number; avg: number; count: number } | null;
+  selectionRange: string;
 }
 
 export default function StatusBar({
@@ -10,6 +11,7 @@ export default function StatusBar({
   sheetCount,
   connected,
   selectionStats,
+  selectionRange,
 }: StatusBarProps) {
   return (
     <div className="statusbar">
@@ -20,17 +22,22 @@ export default function StatusBar({
         <span className="statusbar-item">
           Sheets: {sheetCount}
         </span>
+        {selectionRange && (
+          <span className="statusbar-item statusbar-range">
+            {selectionRange}
+          </span>
+        )}
       </div>
       <div className="statusbar-right">
         {selectionStats && (
           <>
-            <span className="statusbar-item">
-              Sum: {selectionStats.sum}
+            <span className="statusbar-item statusbar-stat">
+              Sum: {selectionStats.sum.toLocaleString()}
             </span>
-            <span className="statusbar-item">
-              Avg: {selectionStats.avg}
+            <span className="statusbar-item statusbar-stat">
+              Avg: {selectionStats.avg.toLocaleString()}
             </span>
-            <span className="statusbar-item">
+            <span className="statusbar-item statusbar-stat">
               Count: {selectionStats.count}
             </span>
           </>

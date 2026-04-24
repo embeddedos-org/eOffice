@@ -313,11 +313,13 @@ body {
 .canvas-area {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   background: var(--bg-canvas);
   overflow: hidden;
   padding: 24px;
+  gap: 0;
 }
 
 .slide-canvas {
@@ -330,6 +332,7 @@ body {
   position: relative;
   overflow: hidden;
   cursor: crosshair;
+  flex-shrink: 0;
 }
 
 .slide-element {
@@ -340,15 +343,25 @@ body {
   border-radius: var(--radius-sm);
   min-width: 40px;
   min-height: 24px;
+  user-select: none;
 }
 
 .slide-element:hover { border-color: var(--accent); }
 .slide-element.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.slide-element.dragging { opacity: 0.85; cursor: grabbing; z-index: 10; }
 
 .slide-element-text {
   outline: none;
   white-space: pre-wrap;
   word-break: break-word;
+  cursor: text;
+}
+
+.slide-element-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
 }
 
 .slide-element-shape {
@@ -358,6 +371,205 @@ body {
   font-size: 11px;
   color: var(--text-inverse);
   font-weight: 600;
+}
+
+.element-drag-handle {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 3px;
+  cursor: grab;
+  opacity: 0.7;
+}
+
+.element-drag-handle:hover { opacity: 1; }
+
+/* === Speaker Notes === */
+.speaker-notes-area {
+  width: 100%;
+  max-width: 800px;
+  margin-top: 8px;
+  flex-shrink: 0;
+}
+
+.speaker-notes-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.speaker-notes-input {
+  width: 100%;
+  min-height: 60px;
+  max-height: 100px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+
+.speaker-notes-input:focus { border-color: var(--accent); }
+.speaker-notes-input::placeholder { color: var(--text-tertiary); }
+
+/* === Toolbar Dropdown === */
+.toolbar-dropdown-wrap {
+  position: relative;
+}
+
+.toolbar-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  z-index: 20;
+  min-width: 130px;
+  padding: 4px 0;
+}
+
+.toolbar-dropdown-wrap:hover .toolbar-dropdown { display: block; }
+
+.toolbar-dropdown button {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.toolbar-dropdown button:hover { background: var(--bg-hover); }
+
+/* === Presenter View === */
+.presenter-view {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+}
+
+.presenter-slide {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+}
+
+.presenter-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font-size: 13px;
+  cursor: default;
+  flex-shrink: 0;
+}
+
+.presenter-controls-left,
+.presenter-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.presenter-controls-center {
+  flex: 1;
+  padding: 0 20px;
+  overflow: hidden;
+}
+
+.presenter-notes {
+  font-size: 12px;
+  color: #ccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.presenter-slide-indicator {
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 60px;
+  text-align: center;
+}
+
+.presenter-timer {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: #aaa;
+}
+
+.presenter-btn {
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.presenter-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.2); }
+.presenter-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.presenter-btn-end {
+  background: rgba(234, 67, 53, 0.7);
+  border-color: rgba(234, 67, 53, 0.5);
+}
+
+.presenter-btn-end:hover { background: rgba(234, 67, 53, 0.9); }
+
+/* === Slide Transitions === */
+.presenter-transition-fade {
+  animation: fadeIn 0.5s ease;
+}
+
+.presenter-transition-slide {
+  animation: slideIn 0.4s ease;
+}
+
+.presenter-transition-zoom {
+  animation: zoomIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes zoomIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 
 .canvas-placeholder {

@@ -108,6 +108,37 @@ emailRouter.get('/folders', async (req: Request, res: Response) => {
   }
 });
 
+emailRouter.post('/folders', async (req: Request, res: Response) => {
+  try {
+    const { accountId, name } = req.body;
+    if (!accountId || !name) {
+      res.status(400).json({ error: 'accountId and name are required' });
+      return;
+    }
+    const service = await getService(accountId);
+    await service.createFolder(name);
+    res.status(201).json({ name, created: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+emailRouter.delete('/folders', async (req: Request, res: Response) => {
+  try {
+    const accountId = req.query.accountId as string;
+    const name = req.query.name as string;
+    if (!accountId || !name) {
+      res.status(400).json({ error: 'accountId and name query params required' });
+      return;
+    }
+    const service = await getService(accountId);
+    await service.deleteFolder(name);
+    res.status(204).send();
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // --- Messages ---
 
 emailRouter.get('/messages', async (req: Request, res: Response) => {
@@ -118,7 +149,6 @@ emailRouter.get('/messages', async (req: Request, res: Response) => {
     const pageSize = parseInt(req.query.pageSize as string) || 50;
 
     if (!accountId) {
-      // Fallback: return empty for backwards compatibility
       res.json({ messages: [], total: 0 });
       return;
     }
@@ -133,7 +163,7 @@ emailRouter.get('/messages', async (req: Request, res: Response) => {
 
 emailRouter.post('/messages/send', upload.array('attachments', 10), async (req: Request, res: Response) => {
   try {
-    const { accountId, to, subject, body, html } = req.body;
+    const { accountId, to, subject, body, html, cc, bcc } = req.body;
     if (!accountId || !to || !subject) {
       res.status(400).json({ error: 'accountId, to, and subject are required' });
       return;
@@ -147,14 +177,29 @@ emailRouter.post('/messages/send', upload.array('attachments', 10), async (req: 
     }));
 
     const service = await getService(accountId);
-    const result = await service.sendMessage(to, subject, body || '', html, attachments);
+    const result = await service.sendMessage(to, subject, body || '', html, attachments, cc, bcc);
     res.status(201).json(result);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// Legacy POST /messages endpoint for backwards compatibility
+emailRouter.post('/messages/move', async (req: Request, res: Response) => {
+  try {
+    const { accountId, uid, fromFolder, toFolder } = req.body;
+    if (!accountId || !uid || !fromFolder || !toFolder) {
+      res.status(400).json({ error: 'accountId, uid, fromFolder, and toFolder are required' });
+      return;
+    }
+    const service = await getService(accountId);
+    await service.moveMessage(parseInt(uid), fromFolder, toFolder);
+    res.json({ moved: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Legacy POST /messages endpoint
 emailRouter.post('/messages', (req: Request, res: Response) => {
   const { to, subject, body, from } = req.body;
   if (!to || !subject) {
@@ -181,7 +226,6 @@ emailRouter.put('/messages/:id/read', async (req: Request, res: Response) => {
     const read = req.body.read ?? true;
 
     if (!accountId) {
-      // Legacy mode
       res.json({ id: req.params.id, read });
       return;
     }
@@ -231,7 +275,100 @@ emailRouter.delete('/messages/:id', async (req: Request, res: Response) => {
   }
 });
 
-// --- Calendar events (keep existing functionality) ---
+// --- Search ---
+
+emailRouter.get('/search', async (req: Request, res: Response) => {
+  try {
+    const accountId = req.query.accountId as string;
+    const query = req.query.query as string;
+    const folder = (req.query.folder as string) || 'INBOX';
+
+    if (!accountId || !query) {
+      res.status(400).json({ error: 'accountId and query are required' });
+      return;
+    }
+
+    const service = await getService(accountId);
+    const results = await service.searchMessages(query, folder);
+    res.json({ messages: results, total: results.length });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- Contacts ---
+
+const contactsStore = new Map<string, any[]>();
+
+emailRouter.get('/contacts', (req: Request, res: Response) => {
+  const accountId = req.query.accountId as string || 'default';
+  const contacts = contactsStore.get(accountId) || [];
+  res.json({ contacts });
+});
+
+emailRouter.post('/contacts', (req: Request, res: Response) => {
+  const { accountId = 'default', name, email } = req.body;
+  if (!email) {
+    res.status(400).json({ error: 'email is required' });
+    return;
+  }
+  const contacts = contactsStore.get(accountId) || [];
+  const contact = {
+    id: crypto.randomUUID(),
+    name: name || email.split('@')[0],
+    email,
+    createdAt: new Date().toISOString(),
+  };
+  contacts.push(contact);
+  contactsStore.set(accountId, contacts);
+  res.status(201).json(contact);
+});
+
+emailRouter.delete('/contacts/:id', (req: Request, res: Response) => {
+  const accountId = (req.query.accountId as string) || 'default';
+  const contacts = contactsStore.get(accountId) || [];
+  const filtered = contacts.filter((c) => c.id !== req.params.id);
+  if (filtered.length === contacts.length) {
+    res.status(404).json({ error: 'Contact not found' });
+    return;
+  }
+  contactsStore.set(accountId, filtered);
+  res.status(204).send();
+});
+
+// --- Signatures ---
+
+const signaturesStore = new Map<string, any[]>();
+
+emailRouter.get('/signatures', (req: Request, res: Response) => {
+  const accountId = (req.query.accountId as string) || 'default';
+  const signatures = signaturesStore.get(accountId) || [];
+  res.json({ signatures });
+});
+
+emailRouter.post('/signatures', (req: Request, res: Response) => {
+  const { accountId = 'default', name, content, isDefault } = req.body;
+  if (!name || !content) {
+    res.status(400).json({ error: 'name and content are required' });
+    return;
+  }
+  const signatures = signaturesStore.get(accountId) || [];
+  if (isDefault) {
+    signatures.forEach((s) => (s.isDefault = false));
+  }
+  const sig = {
+    id: crypto.randomUUID(),
+    name,
+    content,
+    isDefault: isDefault || signatures.length === 0,
+    createdAt: new Date().toISOString(),
+  };
+  signatures.push(sig);
+  signaturesStore.set(accountId, signatures);
+  res.status(201).json(sig);
+});
+
+// --- Calendar events ---
 
 const events = new Map<string, any>();
 

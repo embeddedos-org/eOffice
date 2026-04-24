@@ -29,6 +29,13 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "../apps/email/dist",
+        "to": "email-app",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "directories": {

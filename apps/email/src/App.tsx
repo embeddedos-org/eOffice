@@ -5,17 +5,21 @@ import EmailViewer from './components/EmailViewer';
 import EmailComposer from './components/EmailComposer';
 import EBotSidebar from './components/EBotSidebar';
 import StatusBar from './components/StatusBar';
+import AccountSetup from './components/AccountSetup';
 import { useMailbox } from './hooks/useMailbox';
 import { useEBot } from './hooks/useEBot';
+
+const SERVER_URL = 'http://localhost:3001';
 
 export default function App() {
   const [ebotOpen, setEbotOpen] = useState(false);
   const [ebotResponse, setEbotResponse] = useState('');
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerDefaults, setComposerDefaults] = useState({ to: '', subject: '', body: '' });
+  const [accountSetupOpen, setAccountSetupOpen] = useState(false);
 
   const mailbox = useMailbox();
-  const { connected, loading, draftReply, summarizeThread, smartCompose } = useEBot();
+  const ebot = useEBot();
 
   const folderLabels = { inbox: 'Inbox', sent: 'Sent', drafts: 'Drafts' };
 
@@ -49,7 +53,7 @@ export default function App() {
   const handleSend = useCallback(
     (to: string, subject: string, body: string) => {
       mailbox.addMessage({
-        from: 'me@eoffice.com',
+        from: mailbox.account?.email || 'me@eoffice.com',
         to,
         subject,
         body,
@@ -64,7 +68,7 @@ export default function App() {
 
   const handleEBotAction = useCallback(
     async (action: string) => {
-      if (!connected) return;
+      if (!ebot.connected) return;
       setEbotResponse('');
       try {
         let response = '';
@@ -74,7 +78,7 @@ export default function App() {
               response = '⚠️ Select an email first to draft a reply.';
             } else {
               const { from, subject, body } = mailbox.selectedEmail;
-              response = await draftReply(`From: ${from}\nSubject: ${subject}\n\n${body}`);
+              response = await ebot.draftReply(`From: ${from}\nSubject: ${subject}\n\n${body}`);
               response = `↩️ **Draft Reply**\n\n${response}`;
             }
             break;
@@ -83,21 +87,62 @@ export default function App() {
             if (!mailbox.selectedEmail) {
               response = '⚠️ Select an email first to summarize.';
             } else {
-              response = await summarizeThread(mailbox.selectedEmail.body);
+              response = await ebot.summarizeThread(mailbox.selectedEmail.body);
               response = `📋 **Summary**\n\n${response}`;
             }
             break;
           }
           case 'smart-compose': {
-            response = await smartCompose('a follow-up on the latest project status');
+            response = await ebot.smartCompose('a follow-up on the latest project status');
             response = `✨ **Smart Compose**\n\n${response}`;
+            break;
+          }
+          case 'extract-tasks': {
+            if (!mailbox.selectedEmail) {
+              response = '⚠️ Select an email first to extract tasks.';
+            } else {
+              response = await ebot.extractTasks(mailbox.selectedEmail.body);
+              response = `✅ **Extracted Tasks**\n\n${response}`;
+            }
+            break;
+          }
+          case 'spell-check': {
+            if (!mailbox.selectedEmail) {
+              response = '⚠️ Select an email first.';
+            } else {
+              const result = await ebot.spellCheck(mailbox.selectedEmail.body);
+              if (result.suggestions.length === 0) {
+                response = '📝 **Spell Check**\n\n✅ No issues found!';
+              } else {
+                response = `📝 **Spell Check** — ${result.suggestions.length} issue(s):\n\n${result.suggestions.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n**Corrected:**\n${result.corrected}`;
+              }
+            }
             break;
           }
           case 'improve': {
             if (!mailbox.selectedEmail) {
               response = '⚠️ Select an email first.';
             } else {
-              response = `💡 **Suggestions**\n\n• Consider a clearer subject line\n• Add a specific call to action\n• Keep paragraphs short for readability`;
+              response = await ebot.improveWriting(mailbox.selectedEmail.body);
+              response = `💡 **Improved Version**\n\n${response}`;
+            }
+            break;
+          }
+          case 'rewrite-formal': {
+            if (!mailbox.selectedEmail) {
+              response = '⚠️ Select an email first.';
+            } else {
+              response = await ebot.rewriteText(mailbox.selectedEmail.body, 'formal');
+              response = `👔 **Formal Rewrite**\n\n${response}`;
+            }
+            break;
+          }
+          case 'rewrite-concise': {
+            if (!mailbox.selectedEmail) {
+              response = '⚠️ Select an email first.';
+            } else {
+              response = await ebot.rewriteText(mailbox.selectedEmail.body, 'concise');
+              response = `✂️ **Concise Rewrite**\n\n${response}`;
             }
             break;
           }
@@ -110,7 +155,7 @@ export default function App() {
         setEbotResponse(`❌ **eBot Error**\n\n${msg}`);
       }
     },
-    [connected, draftReply, summarizeThread, smartCompose, mailbox.selectedEmail],
+    [ebot, mailbox.selectedEmail],
   );
 
   return (
@@ -121,8 +166,13 @@ export default function App() {
         onCompose={handleCompose}
         ebotSidebarOpen={ebotOpen}
         onToggleEBot={() => setEbotOpen((p) => !p)}
-        connected={connected}
+        connected={ebot.connected}
         unreadCount={mailbox.unreadCount}
+        account={mailbox.account}
+        serverOnline={mailbox.serverOnline}
+        onOpenAccountSetup={() => setAccountSetupOpen(true)}
+        onRefresh={mailbox.refreshInbox}
+        loading={mailbox.loading}
       />
       <div className="email-body">
         <InboxList
@@ -130,7 +180,7 @@ export default function App() {
           selectedId={mailbox.selectedId}
           onSelect={mailbox.selectEmail}
           onToggleStar={mailbox.toggleStar}
-          folderLabel={folderLabels[mailbox.currentFolder]}
+          folderLabel={folderLabels[mailbox.currentFolder as keyof typeof folderLabels] || mailbox.currentFolder}
         />
         <EmailViewer
           email={mailbox.selectedEmail}
@@ -140,9 +190,9 @@ export default function App() {
         />
         <EBotSidebar
           open={ebotOpen}
-          connected={connected}
+          connected={ebot.connected}
           response={ebotResponse}
-          isLoading={loading}
+          isLoading={ebot.loading}
           onAction={handleEBotAction}
           onClose={() => setEbotOpen(false)}
         />
@@ -154,12 +204,26 @@ export default function App() {
           initialBody={composerDefaults.body}
           onSend={handleSend}
           onClose={() => setComposerOpen(false)}
+          onSpellCheck={ebot.connected ? ebot.spellCheck : undefined}
+          onRewrite={ebot.connected ? ebot.rewriteText : undefined}
+          onImprove={ebot.connected ? ebot.improveWriting : undefined}
+          ebotConnected={ebot.connected}
+          ebotLoading={ebot.loading}
+        />
+      )}
+      {accountSetupOpen && (
+        <AccountSetup
+          serverUrl={SERVER_URL}
+          onClose={() => setAccountSetupOpen(false)}
+          onAccountAdded={() => {
+            mailbox.fetchAccounts();
+          }}
         />
       )}
       <StatusBar
         messageCount={mailbox.folderMessages.length}
         unreadCount={mailbox.unreadCount}
-        connected={connected}
+        connected={ebot.connected}
       />
     </div>
   );

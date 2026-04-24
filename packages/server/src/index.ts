@@ -1,5 +1,7 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import http from 'http';
 import { ebotRouter } from './routes/ebot';
 import { documentsRouter } from './routes/documents';
 import { notesRouter } from './routes/notes';
@@ -16,6 +18,8 @@ import { connectRouter } from './routes/connect';
 import { swayRouter } from './routes/sway';
 import { auditLog } from './middleware/audit';
 import { sanitizeBody } from './middleware/sanitize';
+import { setupCollaboration } from './services/collaboration';
+import { setupSignaling } from './services/signaling';
 
 const app = express();
 const PORT = 3001;
@@ -43,7 +47,8 @@ app.use(sanitizeBody);
 app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
-    version: '0.1.0',
+    version: '0.2.0',
+    features: ['collaboration', 'video-calling', 'file-export', 'charts', 'attachments'],
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });
@@ -64,7 +69,17 @@ app.use('/api/drive', driveRouter);
 app.use('/api/connect', connectRouter);
 app.use('/api/sway', swayRouter);
 
-app.listen(PORT, () => {
+// Create HTTP server for WebSocket upgrade
+const server = http.createServer(app);
+
+// WebSocket services
+setupCollaboration(server);
+setupSignaling(server);
+
+server.listen(PORT, () => {
   // eslint-disable-next-line no-console
-  console.log(`eOffice Server v0.1.0 listening on port ${PORT}`);
+  console.log(`eOffice Server v0.2.0 listening on port ${PORT}`);
+  console.log(`  REST API:    http://localhost:${PORT}/api`);
+  console.log(`  WebSocket:   ws://localhost:${PORT}/ws/collab (collaboration)`);
+  console.log(`  WebSocket:   ws://localhost:${PORT}/ws/signal (video calling)`);
 });

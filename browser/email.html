@@ -33,11 +33,35 @@
 .esh{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid var(--bd)}
 .esb{display:flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid var(--bd);border-radius:6px;background:var(--bg2);color:var(--tx);font-size:12px;cursor:pointer;text-align:left;width:100%;font-family:var(--fn);margin-bottom:4px}.esb:hover{background:var(--bgH);border-color:var(--ac)}
 .esr{flex:1;overflow-y:auto;padding:10px 14px}
+.acct-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:300;display:none;align-items:center;justify-content:center}
+.acct-modal.open{display:flex}
+.acct-box{width:440px;max-height:80vh;overflow-y:auto;background:var(--bg2);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.2);padding:20px}
+.acct-box h3{margin-bottom:12px;font-size:16px}
+.acct-field{margin-bottom:10px}.acct-field label{display:block;font-size:11px;font-weight:600;color:var(--tx2);margin-bottom:4px}
+.acct-field input,.acct-field select{width:100%;padding:7px 10px;border:1px solid var(--bd);border-radius:4px;font-size:13px;background:var(--bg);color:var(--tx);font-family:var(--fn)}
+.acct-provider{display:flex;gap:8px;margin-bottom:12px}
+.acct-provider button{flex:1;padding:10px 8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);cursor:pointer;font-family:var(--fn);font-size:12px;color:var(--tx)}
+.acct-provider button:hover{background:var(--bgH);border-color:var(--ac)}
+.acct-provider button.sel{background:var(--acL);border-color:var(--ac);font-weight:600}
+.acct-status{padding:8px 10px;border-radius:4px;font-size:12px;margin-top:8px}
+.conn-indicator{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:10px}
+.conn-indicator.live{background:#dcfce7;color:#166534}.conn-indicator.mock{background:#fef9c3;color:#854d0e}
 @media(max-width:768px){.es{width:100%}.folders{width:60px}.folder span{display:none}.list{width:100%}.comp{width:100%;right:0}}
 </style></head><body>
 <div class="app">
-<div class="top"><span style="font-size:17px;font-weight:700;color:var(--ac)">&#128231; eMail</span>
-<div style="display:flex;gap:4px"><button class="btn" id="thm">&#127769;</button><button class="btn" id="ebt">&#9889; eBot</button><a href="index.html" class="btn">&#8592; Back</a></div></div>
+<div class="top">
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:17px;font-weight:700;color:var(--ac)">&#128231; eMail</span>
+    <span class="conn-indicator mock" id="connInd">&#128268; Mock</span>
+  </div>
+  <div style="display:flex;gap:4px">
+    <button class="btn" id="acctBtn">&#128100; Account</button>
+    <button class="btn" id="rfshBtn">&#128260; Refresh</button>
+    <button class="btn" id="thm">&#127769;</button>
+    <button class="btn" id="ebt">&#9889; eBot</button>
+    <a href="index.html" class="btn">&#8592; Back</a>
+  </div>
+</div>
 <div class="main"><div class="folders" id="fld"></div><div class="list" id="mL"></div>
 <div class="view" id="mV"><div class="v-e">&#128231;<br>Select an email</div></div></div>
 <div class="comp" id="comp"><div class="ch" onclick="$('comp').classList.toggle('open')">New Message <span>&#8722;</span></div>
@@ -48,11 +72,58 @@
 <aside class="es" id="eS"><div class="esh"><span style="font-size:14px;font-weight:600">&#129302; eBot AI</span><button style="border:0;background:0;color:var(--tx2);font-size:15px;cursor:pointer" id="sCl">&#10005;</button></div>
 <div style="padding:10px 14px;border-bottom:1px solid var(--bd)"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--tx3);font-weight:600;margin-bottom:6px">Email AI</div>
 <button class="esb" data-a="sr">&#128172; Smart Reply</button><button class="esb" data-a="dr">&#9999; Draft Email</button><button class="esb" data-a="sm">&#128203; Summarize</button><button class="esb" data-a="et">&#9989; Extract Tasks</button></div>
+<div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--tx3);font-weight:600;margin-bottom:6px;padding:10px 14px 0">Writing AI</div>
+<div style="padding:0 14px 10px;border-bottom:1px solid var(--bd)">
+<button class="esb" data-a="sc">&#128221; Spell Check</button><button class="esb" data-a="im">&#128161; Improve Writing</button><button class="esb" data-a="rf">&#128084; Make Formal</button><button class="esb" data-a="rc">&#9986; Make Concise</button></div>
 <div class="esr" id="eR"><div style="color:var(--tx3);text-align:center;padding:40px;font-size:12px">&#129302; Choose an AI action</div></div></aside>
+
+<!-- Account Setup Modal -->
+<div class="acct-modal" id="acctModal">
+<div class="acct-box">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h3>&#128231; Email Account Setup</h3>
+    <button class="btn" onclick="$('acctModal').classList.remove('open')">&#10005;</button>
+  </div>
+
+  <div id="acctList" style="margin-bottom:12px"></div>
+
+  <div style="font-size:11px;font-weight:600;color:var(--tx2);text-transform:uppercase;margin-bottom:8px">Add New Account</div>
+
+  <div class="acct-provider" id="provPicker">
+    <button data-p="gmail" class="sel">&#128231; Gmail</button>
+    <button data-p="outlook">&#128236; Outlook</button>
+    <button data-p="yahoo">&#128232; Yahoo</button>
+    <button data-p="custom">&#9881; Custom</button>
+  </div>
+
+  <div class="acct-field"><label>Email Address</label><input id="acEmail" type="email" placeholder="you@example.com"></div>
+  <div class="acct-field"><label>Password / App Password</label><input id="acPass" type="password" placeholder="Your password or app password"></div>
+
+  <div id="customFields" style="display:none">
+    <div style="display:flex;gap:8px">
+      <div class="acct-field" style="flex:1"><label>IMAP Host</label><input id="acImapH" placeholder="imap.example.com"></div>
+      <div class="acct-field" style="width:80px"><label>Port</label><input id="acImapP" type="number" value="993"></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <div class="acct-field" style="flex:1"><label>SMTP Host</label><input id="acSmtpH" placeholder="smtp.example.com"></div>
+      <div class="acct-field" style="width:80px"><label>Port</label><input id="acSmtpP" type="number" value="587"></div>
+    </div>
+  </div>
+
+  <div id="acctStatus"></div>
+
+  <div style="display:flex;gap:8px;margin-top:12px">
+    <button class="btn" onclick="$('acctModal').classList.remove('open')">Cancel</button>
+    <button class="btn-p" id="acctSave">&#128268; Connect & Test</button>
+  </div>
+</div>
+</div>
+
 </div>
 <script>
 (function(){
-var SK='email_data',emails=[],curF='inbox',curId=null,$=function(i){return document.getElementById(i);};
+var API='http://localhost:3001',SK='email_data',emails=[],curF='inbox',curId=null,serverUp=false,activeAcct=null,acctProv='gmail';
+var $=function(i){return document.getElementById(i);};
 var sample=[
 {id:'1',from:'Alice Johnson',to:'me',subject:'Q2 Planning Meeting',body:'Hi team,\n\nLet\'s schedule Q2 planning for Tuesday at 2 PM.\n\nTopics:\n- Budget review\n- Hiring plans\n- Product roadmap\n\nBest,\nAlice',date:'2026-04-03T10:30:00',folder:'inbox',read:false,starred:false},
 {id:'2',from:'Bob Smith',to:'me',subject:'Project Update: eOffice v2',body:'Hello,\n\nUpdate:\n1. Frontend: 85% complete\n2. Backend: 70% complete\n3. Testing: Started\n\nOn track for April 15.\n\nBob',date:'2026-04-02T15:20:00',folder:'inbox',read:false,starred:true},
@@ -61,43 +132,134 @@ var sample=[
 {id:'5',from:'System',to:'me',subject:'Weekly digest',body:'Weekly summary:\n- 12 emails received\n- 5 tasks completed\n- 3 meetings attended',date:'2026-03-30T08:00:00',folder:'inbox',read:true,starred:false}
 ];
 var flds=[{n:'inbox',i:'&#128229;',l:'Inbox'},{n:'sent',i:'&#128228;',l:'Sent'},{n:'starred',i:'&#11088;',l:'Starred'},{n:'drafts',i:'&#128196;',l:'Drafts'},{n:'trash',i:'&#128465;',l:'Trash'}];
+
+// Server connectivity
+async function checkServer(){
+  try{var c=new AbortController();var t=setTimeout(function(){c.abort();},3000);
+  var r=await fetch(API+'/api/health',{signal:c.signal});clearTimeout(t);
+  serverUp=r.ok;updateConnIndicator();if(serverUp)loadAccounts();return r.ok;}
+  catch(e){serverUp=false;updateConnIndicator();return false;}}
+
+function updateConnIndicator(){
+  var el=$('connInd');
+  if(activeAcct){el.className='conn-indicator live';el.innerHTML='&#128994; '+activeAcct.email;}
+  else if(serverUp){el.className='conn-indicator live';el.innerHTML='&#128311; Server Online';}
+  else{el.className='conn-indicator mock';el.innerHTML='&#128268; Offline (Mock)';}}
+
+// Account management
+async function loadAccounts(){
+  try{var r=await fetch(API+'/api/email/accounts');if(r.ok){var d=await r.json();
+  var accts=d.accounts||[];renderAccountList(accts);
+  if(accts.length>0&&!activeAcct){activeAcct=accts[0];updateConnIndicator();fetchServerMail();}}}catch(e){}}
+
+function renderAccountList(accts){
+  var el=$('acctList');if(!accts.length){el.innerHTML='<div style="padding:8px;text-align:center;font-size:12px;color:var(--tx3)">No accounts configured</div>';return;}
+  el.innerHTML='<div style="font-size:11px;font-weight:600;color:var(--tx2);text-transform:uppercase;margin-bottom:6px">Connected Accounts</div>';
+  accts.forEach(function(a){
+    var d=document.createElement('div');d.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--bd);border-radius:6px;margin-bottom:4px;font-size:12px;';
+    var isSel=activeAcct&&activeAcct.id===a.id;
+    if(isSel)d.style.borderColor='var(--ac)';d.style.background=isSel?'var(--acL)':'var(--bg)';
+    d.innerHTML='<div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="switchAcct(\''+a.id+'\')"><span>'+(a.provider==='gmail'?'&#128231;':a.provider==='outlook'?'&#128236;':a.provider==='yahoo'?'&#128232;':'&#9881;')+'</span><span>'+a.email+'</span></div><button class="btn" style="font-size:10px;color:var(--tx3)" onclick="removeAcct(\''+a.id+'\')">&#128465;</button>';
+    el.appendChild(d);});}
+
+window.switchAcct=function(id){
+  fetch(API+'/api/email/accounts').then(function(r){return r.json();}).then(function(d){
+    var a=(d.accounts||[]).find(function(x){return x.id===id;});if(a){activeAcct=a;updateConnIndicator();fetchServerMail();}});};
+
+window.removeAcct=function(id){
+  if(!confirm('Remove this account?'))return;
+  fetch(API+'/api/email/accounts/'+id,{method:'DELETE'}).then(function(){
+    if(activeAcct&&activeAcct.id===id){activeAcct=null;updateConnIndicator();load();render();}loadAccounts();});};
+
+// Fetch real emails from server
+async function fetchServerMail(){
+  if(!activeAcct||!serverUp)return;
+  try{var fm={inbox:'INBOX',sent:'[Gmail]/Sent Mail',drafts:'[Gmail]/Drafts'};
+  var folder=fm[curF]||curF;
+  var r=await fetch(API+'/api/email/messages?accountId='+activeAcct.id+'&folder='+encodeURIComponent(folder));
+  if(r.ok){var d=await r.json();emails=(d.messages||[]).map(function(m){return{id:m.id||String(m.uid),from:m.fromName||m.from,to:m.to,subject:m.subject,body:m.body||m.html||'',date:m.date,folder:curF,read:m.read,starred:m.starred};});
+  render();}}catch(e){}}
+
+// Account setup
+$('acctBtn').onclick=function(){$('acctModal').classList.add('open');if(serverUp)loadAccounts();};
+document.querySelectorAll('#provPicker button').forEach(function(b){b.onclick=function(){
+  document.querySelectorAll('#provPicker button').forEach(function(x){x.classList.remove('sel');});
+  b.classList.add('sel');acctProv=b.dataset.p;
+  $('customFields').style.display=acctProv==='custom'?'block':'none';};});
+
+$('acctSave').onclick=async function(){
+  var email=$('acEmail').value,pass=$('acPass').value;
+  if(!email||!pass){showAcctStatus('error','Email and password required');return;}
+  var body={provider:acctProv,email:email,password:pass};
+  if(acctProv==='custom'){body.imapHost=$('acImapH').value;body.imapPort=parseInt($('acImapP').value);body.smtpHost=$('acSmtpH').value;body.smtpPort=parseInt($('acSmtpP').value);}
+  showAcctStatus('info','Saving account...');
+  try{var r=await fetch(API+'/api/email/accounts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok){var e=await r.json();throw new Error(e.error||'Failed');}
+  var data=await r.json();showAcctStatus('info','Testing connection...');
+  var tr=await fetch(API+'/api/email/accounts/'+data.id+'/test',{method:'POST'});var tres=await tr.json();
+  if(tres.imap&&tres.smtp){showAcctStatus('success','Connected! IMAP + SMTP verified.');activeAcct={id:data.id,email:email,provider:acctProv};updateConnIndicator();
+  setTimeout(function(){$('acctModal').classList.remove('open');fetchServerMail();loadAccounts();},1500);}
+  else{showAcctStatus('error',tres.error||'Connection failed');}}
+  catch(err){showAcctStatus('error',err.message);}};
+
+function showAcctStatus(type,msg){
+  var el=$('acctStatus');var colors={error:'#fef2f2;border:1px solid #fecaca;color:#991b1b',success:'#f0fdf4;border:1px solid #bbf7d0;color:#166534',info:'var(--acL);border:1px solid var(--bd);color:var(--tx2)'};
+  el.innerHTML='<div class="acct-status" style="background:'+colors[type]+'">'+msg+'</div>';}
+
+// Refresh button
+$('rfshBtn').onclick=function(){if(activeAcct&&serverUp){fetchServerMail();}};
+
+// Auto-refresh
+setInterval(function(){if(activeAcct&&serverUp)fetchServerMail();},30000);
+
 function load(){try{var d=JSON.parse(localStorage.getItem(SK));emails=d&&d.length?d:sample;}catch(e){emails=sample;}}
-function save(){localStorage.setItem(SK,JSON.stringify(emails));}
+function save(){if(!activeAcct)localStorage.setItem(SK,JSON.stringify(emails));}
 function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function render(){rF();rL();rV();}
 function rF(){var el=$('fld');el.innerHTML='<button class="btn-p" style="width:100%;margin-bottom:8px" onclick="document.getElementById(\'comp\').classList.add(\'open\')">&#9999; Compose</button>';
 flds.forEach(function(f){var cnt=0;if(f.n==='inbox')cnt=emails.filter(function(e){return e.folder==='inbox'&&!e.read;}).length;
 if(f.n==='starred')cnt=emails.filter(function(e){return e.starred;}).length;
-var d=document.createElement('div');d.className='folder'+(curF===f.n?' sel':'');d.innerHTML=f.i+' <span>'+f.l+'</span>'+(cnt?'<span class="fbadge">'+cnt+'</span>':'');d.onclick=function(){curF=f.n;curId=null;render();};el.appendChild(d);});}
+var d=document.createElement('div');d.className='folder'+(curF===f.n?' sel':'');d.innerHTML=f.i+' <span>'+f.l+'</span>'+(cnt?'<span class="fbadge">'+cnt+'</span>':'');d.onclick=function(){curF=f.n;curId=null;if(activeAcct&&serverUp){fetchServerMail();}else{render();}};el.appendChild(d);});}
 function rL(){var el=$('mL');el.innerHTML='';var fl=emails.filter(function(e){if(curF==='starred')return e.starred;return e.folder===curF;});
 fl.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
 if(!fl.length){el.innerHTML='<div style="padding:40px;text-align:center;color:var(--tx3);font-size:13px">No emails</div>';return;}
 fl.forEach(function(e){var d=document.createElement('div');d.className='mi'+(e.id===curId?' sel':'')+(e.read?'':' unread');
 var dt=new Date(e.date),ds=dt.toLocaleDateString('en',{month:'short',day:'numeric'});
 d.innerHTML='<span class="mi-d">'+ds+'</span><div class="mi-f">'+esc(e.from)+'</div><div class="mi-s">'+esc(e.subject)+'</div><div class="mi-p">'+esc(e.body.substring(0,50))+'</div>';
-d.onclick=function(){curId=e.id;e.read=true;save();render();};el.appendChild(d);});}
+d.onclick=function(){curId=e.id;e.read=true;save();
+if(activeAcct&&serverUp){fetch(API+'/api/email/messages/'+e.id+'/read',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({accountId:activeAcct.id,folder:'INBOX',read:true})}).catch(function(){});}
+render();};el.appendChild(d);});}
 function rV(){var el=$('mV');if(!curId){el.innerHTML='<div class="v-e">&#128231;<br>Select an email</div>';return;}
 var e=emails.find(function(x){return x.id===curId;});if(!e)return;
 el.innerHTML='<div class="v-s">'+esc(e.subject)+'</div><div class="v-m">From: <b>'+esc(e.from)+'</b> &middot; To: '+esc(e.to)+' &middot; '+new Date(e.date).toLocaleString()+'</div><div class="v-b">'+esc(e.body)+'</div><div style="margin-top:20px;display:flex;gap:6px"><button class="btn" onclick="reply()">&#8617; Reply</button><button class="btn" onclick="star()">&#11088; Star</button><button class="btn" onclick="del()">&#128465; Delete</button></div>';}
 window.reply=function(){$('comp').classList.add('open');var e=emails.find(function(x){return x.id===curId;});if(e){$('cTo').value=e.from;$('cSb').value='Re: '+e.subject;$('cBd').value='\n\n---\n'+e.body;}};
-window.star=function(){var e=emails.find(function(x){return x.id===curId;});if(e){e.starred=!e.starred;save();render();}};
-window.del=function(){emails=emails.filter(function(x){return x.id!==curId;});curId=null;save();render();};
+window.star=function(){var e=emails.find(function(x){return x.id===curId;});if(e){e.starred=!e.starred;save();
+if(activeAcct&&serverUp){fetch(API+'/api/email/messages/'+e.id+'/star',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({accountId:activeAcct.id,folder:'INBOX',starred:e.starred})}).catch(function(){});}
+render();}};
+window.del=function(){
+if(activeAcct&&serverUp){fetch(API+'/api/email/messages/'+curId+'?accountId='+activeAcct.id+'&folder=INBOX',{method:'DELETE'}).catch(function(){});}
+emails=emails.filter(function(x){return x.id!==curId;});curId=null;save();render();};
 $('sndB').onclick=function(){var to=$('cTo').value,sb=$('cSb').value,bd=$('cBd').value;if(!to||!sb)return;
-emails.unshift({id:Date.now().toString(),from:'me',to:to,subject:sb,body:bd,date:new Date().toISOString(),folder:'sent',read:true,starred:false});
-save();$('comp').classList.remove('open');$('cTo').value='';$('cSb').value='';$('cBd').value='';render();};
+if(activeAcct&&serverUp){fetch(API+'/api/email/messages/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accountId:activeAcct.id,to:to,subject:sb,body:bd})}).then(function(){setTimeout(fetchServerMail,1000);}).catch(function(){});}
+else{emails.unshift({id:Date.now().toString(),from:'me',to:to,subject:sb,body:bd,date:new Date().toISOString(),folder:'sent',read:true,starred:false});save();}
+$('comp').classList.remove('open');$('cTo').value='';$('cSb').value='';$('cBd').value='';render();};
 $('dscB').onclick=function(){$('comp').classList.remove('open');$('cTo').value='';$('cSb').value='';$('cBd').value='';};
 function oS(){$('eS').classList.add('open');$('oV').style.display='block';}
 function cS(){$('eS').classList.remove('open');$('oV').style.display='none';}
 $('ebt').onclick=function(){$('eS').classList.contains('open')?cS():oS();};$('sCl').onclick=cS;$('oV').onclick=cS;
 async function eA(a){var rp=$('eR'),e=curId?emails.find(function(x){return x.id===curId;}):null,ctx=e?e.subject+'\n'+e.body:'No email selected';
-var pr={'sr':'Write a professional reply to:\n'+ctx,'dr':'Draft a professional email about: ','sm':'Summarize this email:\n'+ctx,'et':'Extract action items from:\n'+ctx};
+var pr={'sr':'Write a professional reply to:\n'+ctx,'dr':'Draft a professional email about: ','sm':'Summarize this email:\n'+ctx,'et':'Extract action items from:\n'+ctx,
+'sc':'Check the following text for spelling and grammar errors. Respond in JSON with keys "suggestions" (array of strings) and "corrected" (the full corrected text).\n\n'+ctx,
+'im':'Improve the following email text. Fix grammar/spelling, improve clarity and tone, make it professional. Return only the improved text.\n\n'+ctx,
+'rf':'Rewrite the following email in a formal professional tone. Return only the rewritten text.\n\n'+ctx,
+'rc':'Rewrite the following email to be more concise and direct. Remove unnecessary words. Return only the rewritten text.\n\n'+ctx};
 rp.innerHTML='<div style="padding:12px;color:var(--tx3)">\u23f3 Thinking...</div>';
-try{var r=await fetch('http://localhost:3001/api/ebot/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:pr[a]||ctx,context:'eMail'}),signal:AbortSignal.timeout(15000)});
+try{var r=await fetch(API+'/api/ebot/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:pr[a]||ctx,context:'eMail'}),signal:AbortSignal.timeout(15000)});
 var d=await r.json(),t=d.reply||d.message||d.response||JSON.stringify(d);rp.innerHTML='<div style="padding:10px;background:var(--acL);border:1px solid var(--bd);border-radius:6px;font-size:11px;line-height:1.6;white-space:pre-wrap">'+t.replace(/</g,'&lt;')+'</div>';
 }catch(e2){rp.innerHTML='<div style="padding:10px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;font-size:11px;color:#991b1b">eBot offline. Start: npm run dev:server</div>';}}
 document.querySelectorAll('.esb').forEach(function(b){b.onclick=function(){eA(b.dataset.a);};});
 var t=localStorage.getItem('eo-theme')||'light';document.documentElement.setAttribute('data-theme',t);$('thm').textContent=t==='dark'?'\u2600\ufe0f':'\ud83c\udf19';
 $('thm').onclick=function(){var c=document.documentElement.getAttribute('data-theme'),n=c==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('eo-theme',n);$('thm').textContent=n==='dark'?'\u2600\ufe0f':'\ud83c\udf19';};
-load();render();
+load();render();checkServer();
 })();
 </script></body></html>

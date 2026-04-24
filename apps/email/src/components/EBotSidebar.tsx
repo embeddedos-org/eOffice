@@ -66,10 +66,48 @@ export default function EBotSidebar({
                 <button
                   className="ebot-action-btn"
                   disabled={isLoading}
+                  onClick={() => onAction('extract-tasks')}
+                >
+                  <span className="ebot-action-icon">✅</span>
+                  <span>Extract Tasks</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="ebot-actions">
+              <div className="ebot-actions-label">Writing AI</div>
+              <div className="ebot-actions-grid">
+                <button
+                  className="ebot-action-btn"
+                  disabled={isLoading}
+                  onClick={() => onAction('spell-check')}
+                >
+                  <span className="ebot-action-icon">📝</span>
+                  <span>Spell Check</span>
+                </button>
+                <button
+                  className="ebot-action-btn"
+                  disabled={isLoading}
                   onClick={() => onAction('improve')}
                 >
                   <span className="ebot-action-icon">💡</span>
                   <span>Improve</span>
+                </button>
+                <button
+                  className="ebot-action-btn"
+                  disabled={isLoading}
+                  onClick={() => onAction('rewrite-formal')}
+                >
+                  <span className="ebot-action-icon">👔</span>
+                  <span>Make Formal</span>
+                </button>
+                <button
+                  className="ebot-action-btn"
+                  disabled={isLoading}
+                  onClick={() => onAction('rewrite-concise')}
+                >
+                  <span className="ebot-action-icon">✂️</span>
+                  <span>Make Concise</span>
                 </button>
               </div>
             </div>
@@ -90,7 +128,7 @@ export default function EBotSidebar({
                 </div>
               ) : (
                 <div className="ebot-empty">
-                  Select an email and use eBot to draft replies, summarize threads, or compose messages.
+                  Select an email and use eBot to draft replies, spell-check, rewrite, summarize, or compose messages with AI.
                 </div>
               )}
             </div>

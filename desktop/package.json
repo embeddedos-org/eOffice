@@ -13,6 +13,7 @@
   },
   "build": {
     "appId": "org.embeddedos.eoffice",
+    "forceCodeSigning": false,
     "productName": "eOffice Suite",
     "copyright": "Copyright © 2026 EoS Project",
     "files": [
@@ -38,14 +39,14 @@
         "nsis",
         "portable"
       ],
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.ico",
+      "signAndEditExecutable": false
     },
     "mac": {
       "target": [
-        "dmg",
         "zip"
       ],
-      "icon": "assets/icon.icns",
+      "icon": "assets/icon.png",
       "category": "public.app-category.productivity"
     },
     "linux": {

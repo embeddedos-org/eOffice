@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { FolderInfo } from '../components/FolderTree';
+import { API_URL } from '../../../shared/config';
 
 export type Folder = 'inbox' | 'sent' | 'drafts' | 'spam' | 'trash' | 'archive' | string;
 
@@ -24,7 +25,7 @@ export interface EmailAccount {
   provider: string;
 }
 
-const SERVER_URL = 'http://localhost:3001';
+const SERVER_URL = API_URL;
 const REFRESH_INTERVAL = 30000;
 
 let nextId = 1;

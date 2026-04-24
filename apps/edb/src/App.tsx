@@ -8,6 +8,7 @@ import ERDView from './components/ERDView';
 import FormEntry from './components/FormEntry';
 import EBotSidebar from './components/EBotSidebar';
 import StatusBar from './components/StatusBar';
+import InputDialog, { ConfirmDialog } from '../../shared/InputDialog';
 import { useDatabase } from './hooks/useDatabase';
 import { useEBot } from './hooks/useEBot';
 
@@ -15,17 +16,23 @@ export default function App() {
   const [ebotOpen, setEbotOpen] = useState(false);
   const [currentView, setCurrentView] = useState<DBView>('table');
   const [showFormEntry, setShowFormEntry] = useState(false);
+  const [showNewTable, setShowNewTable] = useState(false);
+  const [showImportAlert, setShowImportAlert] = useState(false);
   const db = useDatabase();
   const ebot = useEBot();
 
   const handleNewTable = () => {
-    const name = prompt('Table name:');
-    if (name?.trim()) db.createTable(name.trim());
+    setShowNewTable(true);
+  };
+
+  const handleCreateTable = (name: string) => {
+    db.createTable(name);
+    setShowNewTable(false);
   };
 
   const handleImportCSV = (csv: string) => {
     if (!db.selectedTableId) {
-      alert('Select a table first to import CSV data into.');
+      setShowImportAlert(true);
       return;
     }
     db.importCSV(db.selectedTableId, csv);
@@ -104,6 +111,26 @@ export default function App() {
           onClose={() => setShowFormEntry(false)}
         />
       )}
+
+      <InputDialog
+        open={showNewTable}
+        title="Create Table"
+        label="Table Name"
+        placeholder="e.g., users"
+        onConfirm={handleCreateTable}
+        onCancel={() => setShowNewTable(false)}
+      />
+
+      <ConfirmDialog
+        open={showImportAlert}
+        title="Import CSV"
+        message="Select a table first to import CSV data into."
+        confirmLabel="OK"
+        cancelLabel="Close"
+        onConfirm={() => setShowImportAlert(false)}
+        onCancel={() => setShowImportAlert(false)}
+      />
+
       <StatusBar
         tableCount={db.tables.length}
         rowCount={db.totalRows}

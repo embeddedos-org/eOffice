@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import os from 'os';
+import path from 'path';
 import { AuthRequest, pickFields } from '../middleware/auth';
 import { validateStringLength, MAX_TITLE_LENGTH } from '../middleware/validate';
+import { FileStore } from '../storage/store';
 
 interface DriveFile {
   id: string;
@@ -15,15 +18,17 @@ interface DriveFile {
   ownerId: string;
 }
 
-const store = new Map<string, DriveFile>();
+const store = new FileStore<DriveFile>(path.join(os.homedir(), '.eoffice', 'data', 'drive'));
 
 export const driveRouter = Router();
 
 driveRouter.get('/', (req: Request, res: Response) => {
   const userId = (req as AuthRequest).user?.id;
-  const items = Array.from(store.values()).filter((f) => f.ownerId === userId);
+  const items = store.list().filter((f) => f.ownerId === userId);
   res.json({ files: items, total: items.length });
 });
+
+driveRouter.post('/',
 
 driveRouter.post('/', (req: Request, res: Response) => {
   const userId = (req as AuthRequest).user?.id;
@@ -53,7 +58,7 @@ driveRouter.post('/', (req: Request, res: Response) => {
 
 driveRouter.get('/folder/:parentId', (req: Request, res: Response) => {
   const userId = (req as AuthRequest).user?.id;
-  const items = Array.from(store.values()).filter(
+const items = store.list().filter(
     (f) => f.parentId === req.params.parentId && f.ownerId === userId,
   );
   res.json({ files: items, total: items.length });

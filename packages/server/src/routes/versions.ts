@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import os from 'os';
+import path from 'path';
 import { AuthRequest } from '../middleware/auth';
 import { validateStringLength, MAX_CONTENT_LENGTH } from '../middleware/validate';
+import { FileStore } from '../storage/store';
 
 interface VersionEntry {
   id: string;
@@ -14,7 +17,7 @@ interface VersionEntry {
   ownerId: string;
 }
 
-const store = new Map<string, VersionEntry[]>();
+const store = new FileStore<VersionEntry[]>(path.join(os.homedir(), '.eoffice', 'data', 'versions'));
 
 function versionKey(type: string, id: string): string {
   const safeType = type.replace(/[^a-zA-Z0-9_-]/g, '');

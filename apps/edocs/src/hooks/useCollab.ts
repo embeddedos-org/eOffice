@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { WS_URL } from '../../../shared/config';
 
 interface CollabUser {
   id: string;
@@ -13,7 +14,7 @@ interface UseCollabOptions {
   serverUrl?: string;
 }
 
-export function useCollab({ docId, userName, serverUrl = 'ws://localhost:3001' }: UseCollabOptions) {
+export function useCollab({ docId, userName, serverUrl = WS_URL }: UseCollabOptions) {
   const [connected, setConnected] = useState(false);
   const [users, setUsers] = useState<CollabUser[]>([]);
   const [userId, setUserId] = useState('');

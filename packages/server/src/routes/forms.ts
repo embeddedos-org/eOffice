@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import os from 'os';
+import path from 'path';
 import { AuthRequest, pickFields } from '../middleware/auth';
 import { validateStringLength, MAX_TITLE_LENGTH } from '../middleware/validate';
+import { FileStore } from '../storage/store';
 
 interface FormField {
   id: string;
@@ -27,14 +30,14 @@ interface Submission {
   submitted_at: Date;
 }
 
-const store = new Map<string, FormRecord>();
-const submissions = new Map<string, Submission[]>();
+const store = new FileStore<FormRecord>(path.join(os.homedir(), '.eoffice', 'data', 'forms'));
+const submissions = new FileStore<Submission[]>(path.join(os.homedir(), '.eoffice', 'data', 'form-submissions'));
 
 export const formsRouter = Router();
 
 formsRouter.get('/', (req: Request, res: Response) => {
   const userId = (req as AuthRequest).user?.id;
-  const items = Array.from(store.values()).filter((f) => f.ownerId === userId);
+  const items = store.list().filter((f) => f.ownerId === userId);
   res.json({ forms: items, total: items.length });
 });
 

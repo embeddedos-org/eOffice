@@ -117,7 +117,7 @@ export default function FilePreview({ file, formatSize, onGenerateShareLink, onD
         <button className="file-preview-action-btn" onClick={handleRename}>
           ✏️ Rename
         </button>
-        <button className="file-preview-action-btn" onClick={() => alert(`Downloading ${file.name}... (simulated)`)}>
+        <button className="file-preview-action-btn" onClick={() => { const a = document.createElement('a'); a.href = '#'; a.download = file.name; a.click(); }}>
           📥 Download
         </button>
         <button className="file-preview-action-btn danger" onClick={() => onDelete(file.id)}>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Note } from '../App';
 import { useEBot } from '../hooks/useEBot';
+import { API_URL } from '../../../shared/config';
 
 interface EBotPanelProps {
   note: Note;
@@ -106,7 +107,7 @@ export default function EBotPanel({ note, isOpen, onToggle, onApplyTags }: EBotP
         <div className="ebot-body">
           {!connected && (
             <div className="ebot-error">
-              eBot is unavailable. Check that the server is running at http://localhost:3001.
+              eBot is unavailable. Check that the server is running at {API_URL}.
             </div>
           )}
 

@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { sanitizeHtml } from '@eoffice/core';
+import InputDialog from '../../../shared/InputDialog';
 import type { EmailSignature } from './SignatureEditor';
 
 interface EmailComposerProps {
@@ -112,8 +113,8 @@ export default function EmailComposer({
         setAiStatus(`✅ Fixed ${result.suggestions.length} issue(s)`);
         setAiResult(result.suggestions.map((s, i) => `${i + 1}. ${s}`).join('\n'));
       }
-    } catch (e: any) {
-      setAiStatus(`❌ ${e.message}`);
+    } catch (e: unknown) {
+      setAiStatus(`❌ ${e instanceof Error ? e.message : 'Failed'}`);
     } finally {
       setProcessing(false);
     }
@@ -128,8 +129,8 @@ export default function EmailComposer({
       const rewritten = await onRewrite(body, tone);
       setBody(rewritten);
       setAiStatus(`✅ Rewritten in ${tone} tone`);
-    } catch (e: any) {
-      setAiStatus(`❌ ${e.message}`);
+    } catch (e: unknown) {
+      setAiStatus(`❌ ${e instanceof Error ? e.message : 'Failed'}`);
     } finally {
       setProcessing(false);
     }
@@ -144,8 +145,8 @@ export default function EmailComposer({
       const improved = await onImprove(body);
       setBody(improved);
       setAiStatus('✅ Writing improved');
-    } catch (e: any) {
-      setAiStatus(`❌ ${e.message}`);
+    } catch (e: unknown) {
+      setAiStatus(`❌ ${e instanceof Error ? e.message : 'Failed'}`);
     } finally {
       setProcessing(false);
     }
@@ -163,6 +164,8 @@ export default function EmailComposer({
     e.preventDefault();
     e.stopPropagation();
   };
+
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
 
   return (
     <div className="composer-overlay" onClick={onClose}>
@@ -284,10 +287,7 @@ export default function EmailComposer({
               <button onClick={() => execFormat('italic')} title="Italic"><em>I</em></button>
               <button onClick={() => execFormat('underline')} title="Underline"><u>U</u></button>
               <button onClick={() => execFormat('insertUnorderedList')} title="List">•</button>
-              <button onClick={() => {
-                const url = prompt('Enter link URL:');
-                if (url) execFormat('createLink', url);
-              }} title="Link">🔗</button>
+              <button onClick={() => setShowLinkDialog(true)} title="Link">🔗</button>
               <input
                 type="color"
                 onChange={(e) => execFormat('foreColor', e.target.value)}
@@ -382,6 +382,15 @@ export default function EmailComposer({
           </div>
         </div>
       </div>
+
+      <InputDialog
+        open={showLinkDialog}
+        title="Insert Link"
+        label="URL"
+        placeholder="https://example.com"
+        onConfirm={(url) => { execFormat('createLink', url); setShowLinkDialog(false); }}
+        onCancel={() => setShowLinkDialog(false)}
+      />
     </div>
   );
 }

@@ -1,20 +1,23 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import os from 'os';
+import path from 'path';
 import type { NoteEntry } from '@eoffice/core';
 import { AuthRequest, pickFields } from '../middleware/auth';
 import { validateStringLength, MAX_TITLE_LENGTH, MAX_CONTENT_LENGTH, MAX_TAG_LENGTH } from '../middleware/validate';
+import { FileStore } from '../storage/store';
 
 interface OwnedNote extends NoteEntry {
   ownerId: string;
 }
 
-const store = new Map<string, OwnedNote>();
+const store = new FileStore<OwnedNote>(path.join(os.homedir(), '.eoffice', 'data', 'notes'));
 
 export const notesRouter = Router();
 
 notesRouter.get('/', (req: Request, res: Response) => {
   const userId = (req as AuthRequest).user?.id;
-  let notes = Array.from(store.values()).filter((n) => n.ownerId === userId);
+  let notes = store.list().filter((n) => n.ownerId === userId);
 
   const search = req.query.search as string | undefined;
   if (search) {

@@ -1,20 +1,23 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import os from 'os';
+import path from 'path';
 import type { Document } from '@eoffice/core';
 import { AuthRequest, pickFields } from '../middleware/auth';
 import { validateStringLength, MAX_TITLE_LENGTH, MAX_CONTENT_LENGTH } from '../middleware/validate';
+import { FileStore } from '../storage/store';
 
 interface OwnedDocument extends Document {
   ownerId: string;
 }
 
-const store = new Map<string, OwnedDocument>();
+const store = new FileStore<OwnedDocument>(path.join(os.homedir(), '.eoffice', 'data', 'documents'));
 
 export const documentsRouter = Router();
 
 documentsRouter.get('/', (req: Request, res: Response) => {
   const userId = (req as AuthRequest).user?.id;
-  const documents = Array.from(store.values()).filter((d) => d.ownerId === userId);
+  const documents = store.list().filter((d) => d.ownerId === userId);
   res.json({ documents, total: documents.length });
 });
 

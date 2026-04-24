@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import os from 'os';
+import path from 'path';
 import { AuthRequest, pickFields } from '../middleware/auth';
 import { validateStringLength, MAX_TITLE_LENGTH } from '../middleware/validate';
+import { FileStore } from '../storage/store';
 
 interface TaskItem {
   id: string;
@@ -23,13 +26,13 @@ interface Board {
   ownerId: string;
 }
 
-const boards = new Map<string, Board>();
+const boards = new FileStore<Board>(path.join(os.homedir(), '.eoffice', 'data', 'boards'));
 
 export const tasksRouter = Router();
 
 tasksRouter.get('/boards', (req: Request, res: Response) => {
   const userId = (req as AuthRequest).user?.id;
-  const items = Array.from(boards.values()).filter((b) => b.ownerId === userId);
+  const items = boards.list().filter((b) => b.ownerId === userId);
   res.json({ boards: items, total: items.length });
 });
 
@@ -104,6 +107,7 @@ tasksRouter.post('/boards/:id/tasks', (req: Request, res: Response) => {
   };
   board.tasks.push(task);
   board.updated_at = new Date();
+  boards.set(board.id, board);
   res.status(201).json(task);
 });
 
@@ -120,6 +124,7 @@ tasksRouter.put('/boards/:id/tasks/:taskId', (req: Request, res: Response) => {
   const allowed = pickFields<TaskItem>(req.body, ['title', 'description', 'column', 'assignee', 'priority']);
   board.tasks[idx] = { ...board.tasks[idx], ...allowed };
   board.updated_at = new Date();
+  boards.set(board.id, board);
   res.json(board.tasks[idx]);
 });
 
@@ -132,5 +137,6 @@ tasksRouter.delete('/boards/:id/tasks/:taskId', (req: Request, res: Response) =>
   }
   board.tasks = board.tasks.filter((t) => t.id !== req.params.taskId);
   board.updated_at = new Date();
+  boards.set(board.id, board);
   res.status(204).send();
 });

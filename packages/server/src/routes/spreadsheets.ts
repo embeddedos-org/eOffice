@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import os from 'os';
+import path from 'path';
 import { AuthRequest } from '../middleware/auth';
 import { validateStringLength, MAX_TITLE_LENGTH } from '../middleware/validate';
+import { FileStore } from '../storage/store';
 
 interface CellData {
   value: string;
@@ -25,12 +28,12 @@ interface StoredSpreadsheet {
   ownerId: string;
 }
 
-const store = new Map<string, StoredSpreadsheet>();
+const store = new FileStore<StoredSpreadsheet>(path.join(os.homedir(), '.eoffice', 'data', 'spreadsheets'));
 export const spreadsheetsRouter = Router();
 
 spreadsheetsRouter.get('/', (req: Request, res: Response) => {
   const userId = (req as AuthRequest).user?.id;
-  const spreadsheets = Array.from(store.values()).filter((s) => s.ownerId === userId);
+  const spreadsheets = store.list().filter((s) => s.ownerId === userId);
   res.json({ spreadsheets, total: spreadsheets.length });
 });
 
@@ -84,7 +87,7 @@ spreadsheetsRouter.put('/:id', (req: Request, res: Response) => {
   if (typeof title === 'string') {
     const titleErr = validateStringLength(title, 'title', MAX_TITLE_LENGTH);
     if (titleErr) { res.status(400).json({ error: titleErr }); return; }
-    spreadsheet.title = title;
+  spreadsheet.title = title;
   }
   spreadsheet.updated_at = new Date();
   store.set(spreadsheet.id, spreadsheet);

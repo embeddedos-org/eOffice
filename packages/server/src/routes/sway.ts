@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import os from 'os';
+import path from 'path';
 import { AuthRequest } from '../middleware/auth';
 import { validateStringLength, MAX_TITLE_LENGTH, MAX_CONTENT_LENGTH } from '../middleware/validate';
+import { FileStore } from '../storage/store';
 
 interface SwaySlide {
   id: string;
@@ -28,13 +31,13 @@ interface SwayRecord {
   ownerId: string;
 }
 
-const store = new Map<string, SwayRecord>();
+const store = new FileStore<SwayRecord>(path.join(os.homedir(), '.eoffice', 'data', 'sway'));
 
 export const swayRouter = Router();
 
 swayRouter.get('/', (req: Request, res: Response) => {
   const userId = (req as AuthRequest).user?.id;
-  const items = Array.from(store.values()).filter((s) => s.ownerId === userId);
+  const items = store.list().filter((s) => s.ownerId === userId);
   res.json({ presentations: items, total: items.length });
 });
 
@@ -99,6 +102,7 @@ swayRouter.post('/:id/slides', (req: Request, res: Response) => {
   };
   sway.slides.push(slide);
   sway.updated_at = new Date();
+  store.set(sway.id, sway);
   res.status(201).json(slide);
 });
 
@@ -111,6 +115,7 @@ swayRouter.delete('/:id/slides/:slideId', (req: Request, res: Response) => {
   }
   sway.slides = sway.slides.filter((s) => s.id !== req.params.slideId);
   sway.updated_at = new Date();
+  store.set(sway.id, sway);
   res.status(204).send();
 });
 
@@ -135,5 +140,6 @@ swayRouter.post('/:id/slides/:slideId/respond', (req: Request, res: Response) =>
     submitted_at: new Date(),
   };
   slide.responses.push(response);
+  store.set(sway.id, sway);
   res.status(201).json(response);
 });

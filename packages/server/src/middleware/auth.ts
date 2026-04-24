@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
+import os from 'os';
+import path from 'path';
+import { FileStore } from '../storage/store';
 
 const JWT_SECRET = process.env.JWT_SECRET || (() => {
   const secret = crypto.randomBytes(64).toString('hex');
@@ -32,7 +35,7 @@ interface UserRecord {
   role: string;
 }
 
-const users = new Map<string, UserRecord>();
+const users = new FileStore<UserRecord>(path.join(os.homedir(), '.eoffice', 'data', 'users'));
 
 // --- Password hashing with scrypt (Node.js built-in) ---
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import InputDialog from '../../../shared/InputDialog';
 import type { Note, Notebook } from '../App';
 
 interface NoteListProps {
@@ -86,15 +87,16 @@ export default function NoteList({
     onTogglePin(id);
   };
 
+  const [showNotebookDialog, setShowNotebookDialog] = useState(false);
+  const [showSectionDialog, setShowSectionDialog] = useState<string | null>(null);
+
   const handleAddNotebook = () => {
-    const name = prompt('Notebook name:');
-    if (name?.trim()) onAddNotebook(name.trim());
+    setShowNotebookDialog(true);
   };
 
   const handleAddSection = (e: React.MouseEvent, notebookId: string) => {
     e.stopPropagation();
-    const name = prompt('Section name:');
-    if (name?.trim()) onAddSection(notebookId, name.trim());
+    setShowSectionDialog(notebookId);
   };
 
   return (
@@ -234,6 +236,24 @@ export default function NoteList({
           ))
         )}
       </div>
+
+      <InputDialog
+        open={showNotebookDialog}
+        title="New Notebook"
+        label="Notebook Name"
+        placeholder="e.g., Work Notes"
+        onConfirm={(name) => { onAddNotebook(name); setShowNotebookDialog(false); }}
+        onCancel={() => setShowNotebookDialog(false)}
+      />
+
+      <InputDialog
+        open={showSectionDialog !== null}
+        title="New Section"
+        label="Section Name"
+        placeholder="e.g., Meeting Notes"
+        onConfirm={(name) => { if (showSectionDialog) onAddSection(showSectionDialog, name); setShowSectionDialog(null); }}
+        onCancel={() => setShowSectionDialog(null)}
+      />
     </aside>
   );
 }

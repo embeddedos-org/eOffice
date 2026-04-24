@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { API_URL } from '../../../shared/config';
 
-const API_BASE = 'http://localhost:3001/api/ebot';
+const API_BASE = API_URL + '/api/ebot';
 
 export interface GrammarResult {
   suggestions: string[];

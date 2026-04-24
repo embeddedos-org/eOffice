@@ -21,8 +21,9 @@ import RulesEditor, { loadRules, saveRules } from './components/RulesEditor';
 import type { EmailRule } from './components/RulesEditor';
 import { useMailbox } from './hooks/useMailbox';
 import { useEBot } from './hooks/useEBot';
+import { API_URL } from '../../shared/config';
 
-const SERVER_URL = 'http://localhost:3001';
+const SERVER_URL = API_URL;
 
 type SidePanel = 'none' | 'contacts' | 'search';
 

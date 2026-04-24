@@ -6,6 +6,7 @@ import EBotSidebar from './components/EBotSidebar';
 import StatusBar from './components/StatusBar';
 import DocumentSidebar, { DocMeta, TEMPLATES } from './components/DocumentSidebar';
 import { useEBot } from './hooks/useEBot';
+import { API_URL } from '../../shared/config';
 import { exportToDocx, exportToPdf, exportToHtml, exportToMarkdown } from '@eoffice/core/src/file-export';
 
 interface FormatState {
@@ -327,7 +328,7 @@ export default function App() {
         setEbotResponse(response);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
-        setEbotResponse(`❌ **eBot Error**\n\n${msg}\n\nPlease check that the eBot server is running at http://localhost:3001.`);
+        setEbotResponse(`❌ **eBot Error**\n\n${msg}\n\nPlease check that the eBot server is running at ${API_URL}.`);
       }
     },
     [ebotConnected, content, summarize, rewrite, grammarCheck, translate]

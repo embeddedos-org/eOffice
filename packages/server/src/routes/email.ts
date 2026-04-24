@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import os from 'os';
+import path from 'path';
 import multer from 'multer';
 import { EmailService, PROVIDER_PRESETS } from '../services/email-service';
 import {
@@ -11,6 +13,7 @@ import {
 import { AuthRequest } from '../middleware/auth';
 import { emailSendLimiter } from '../middleware/rate-limit';
 import { validateEmail, validateStringLength, MAX_TITLE_LENGTH, MAX_CONTENT_LENGTH, MAX_NAME_LENGTH } from '../middleware/validate';
+import { FileStore } from '../storage/store';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 const activeServices = new Map<string, EmailService>();
@@ -348,11 +351,11 @@ interface Contact {
   ownerId: string;
 }
 
-const contactsStore = new Map<string, Contact>();
+const contactsStore = new FileStore<Contact>(path.join(os.homedir(), '.eoffice', 'data', 'contacts'));
 
 emailRouter.get('/contacts', (req: Request, res: Response) => {
   const userId = (req as AuthRequest).user?.id;
-  const contacts = Array.from(contactsStore.values()).filter((c) => c.ownerId === userId);
+  const contacts = contactsStore.list().filter((c) => c.ownerId === userId);
   res.json({ contacts });
 });
 
@@ -403,11 +406,11 @@ interface Signature {
   ownerId: string;
 }
 
-const signaturesStore = new Map<string, Signature>();
+const signaturesStore = new FileStore<Signature>(path.join(os.homedir(), '.eoffice', 'data', 'signatures'));
 
 emailRouter.get('/signatures', (req: Request, res: Response) => {
   const userId = (req as AuthRequest).user?.id;
-  const signatures = Array.from(signaturesStore.values()).filter((s) => s.ownerId === userId);
+  const signatures = signaturesStore.list().filter((s) => s.ownerId === userId);
   res.json({ signatures });
 });
 
@@ -425,9 +428,9 @@ emailRouter.post('/signatures', (req: Request, res: Response) => {
   const contentErr = validateStringLength(content, 'content', MAX_CONTENT_LENGTH);
   if (contentErr) { res.status(400).json({ error: contentErr }); return; }
 
-  const userSigs = Array.from(signaturesStore.values()).filter((s) => s.ownerId === userId);
+const userSigs = signaturesStore.list().filter((s) => s.ownerId === userId);
   if (isDefault) {
-    userSigs.forEach((s) => { s.isDefault = false; });
+    userSigs.forEach((s) => { s.isDefault = false; signaturesStore.set(s.id, s); });
   }
 
   const sig: Signature = {
@@ -454,11 +457,11 @@ interface CalendarEvent {
   ownerId: string;
 }
 
-const events = new Map<string, CalendarEvent>();
+const events = new FileStore<CalendarEvent>(path.join(os.homedir(), '.eoffice', 'data', 'events'));
 
 emailRouter.get('/events', (req: Request, res: Response) => {
   const userId = (req as AuthRequest).user?.id;
-  const items = Array.from(events.values()).filter((e) => e.ownerId === userId);
+  const items = events.list().filter((e) => e.ownerId === userId);
   res.json({ events: items, total: items.length });
 });
 

@@ -54,7 +54,7 @@ export default function MessageThread({ messages, channelName, typingUser }: Mes
                     <div className="message-file-size">{formatFileSize(msg.fileSize)}</div>
                   )}
                 </div>
-                <button className="message-file-download" onClick={() => alert(`Downloading ${msg.fileName}... (simulated)`)}>
+                <button className="message-file-download" onClick={() => { const a = document.createElement('a'); a.href = '#'; a.download = msg.fileName || 'file'; a.click(); }}>
                   📥
                 </button>
               </div>

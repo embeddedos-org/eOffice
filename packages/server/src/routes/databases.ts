@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import os from 'os';
+import path from 'path';
 import { AuthRequest } from '../middleware/auth';
 import { validateStringLength, MAX_NAME_LENGTH } from '../middleware/validate';
+import { FileStore } from '../storage/store';
 
 interface TableColumn {
   name: string;
@@ -18,13 +21,13 @@ interface DBTable {
   ownerId: string;
 }
 
-const tables = new Map<string, DBTable>();
+const tables = new FileStore<DBTable>(path.join(os.homedir(), '.eoffice', 'data', 'databases'));
 
 export const databasesRouter = Router();
 
 databasesRouter.get('/tables', (req: Request, res: Response) => {
   const userId = (req as AuthRequest).user?.id;
-  const items = Array.from(tables.values()).filter((t) => t.ownerId === userId);
+  const items = tables.list().filter((t) => t.ownerId === userId);
   res.json({ tables: items, total: items.length });
 });
 
@@ -87,6 +90,7 @@ databasesRouter.post('/tables/:id/rows', (req: Request, res: Response) => {
   }
   table.rows.push(row);
   table.updated_at = new Date();
+  tables.set(table.id, table);
   res.status(201).json({ index: table.rows.length - 1, row });
 });
 
@@ -109,6 +113,7 @@ databasesRouter.put('/tables/:id/rows/:index', (req: Request, res: Response) => 
   }
   table.rows[idx] = row;
   table.updated_at = new Date();
+  tables.set(table.id, table);
   res.json({ index: idx, row: table.rows[idx] });
 });
 
@@ -126,5 +131,6 @@ databasesRouter.delete('/tables/:id/rows/:index', (req: Request, res: Response) 
   }
   table.rows.splice(idx, 1);
   table.updated_at = new Date();
+  tables.set(table.id, table);
   res.status(204).send();
 });

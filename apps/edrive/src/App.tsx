@@ -5,18 +5,24 @@ import FilePreview from './components/FilePreview';
 import UploadZone from './components/UploadZone';
 import EBotSidebar from './components/EBotSidebar';
 import StatusBar from './components/StatusBar';
+import InputDialog from '../../shared/InputDialog';
 import { useDrive } from './hooks/useDrive';
 import { useEBot } from './hooks/useEBot';
 
 export default function App() {
   const [ebotOpen, setEbotOpen] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [showNewFolder, setShowNewFolder] = useState(false);
   const drive = useDrive();
   const ebot = useEBot();
 
   const handleNewFolder = () => {
-    const name = prompt('Folder name:');
-    if (name?.trim()) drive.createFolder(name.trim());
+    setShowNewFolder(true);
+  };
+
+  const handleCreateFolder = (name: string) => {
+    drive.createFolder(name);
+    setShowNewFolder(false);
   };
 
   return (
@@ -62,6 +68,16 @@ export default function App() {
       {showUpload && (
         <UploadZone onUpload={drive.simulateUpload} uploads={drive.uploads} />
       )}
+
+      <InputDialog
+        open={showNewFolder}
+        title="New Folder"
+        label="Folder Name"
+        placeholder="e.g., Documents"
+        onConfirm={handleCreateFolder}
+        onCancel={() => setShowNewFolder(false)}
+      />
+
       <StatusBar
         fileCount={drive.files.length}
         totalSize={drive.formatSize(drive.totalSize)}

@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { WS_URL } from '../../../shared/config';
 
 interface Participant {
   id: string;
@@ -8,7 +9,7 @@ interface Participant {
   cameraOff?: boolean;
 }
 
-export function useVideoCall(serverUrl: string = 'ws://localhost:3001') {
+export function useVideoCall(serverUrl: string = WS_URL) {
   const [inCall, setInCall] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);

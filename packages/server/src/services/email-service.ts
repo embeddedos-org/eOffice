@@ -119,8 +119,8 @@ export class EmailService {
       await testImap.connect();
       result.imap = true;
       await testImap.logout();
-    } catch (e: any) {
-      result.error = `IMAP: ${e.message}`;
+    } catch (e: unknown) {
+      result.error = `IMAP: ${e instanceof Error ? e.message : 'Connection failed'}`;
     }
 
     try {
@@ -133,8 +133,9 @@ export class EmailService {
       await testSmtp.verify();
       result.smtp = true;
       testSmtp.close();
-    } catch (e: any) {
-      result.error = (result.error ? result.error + '; ' : '') + `SMTP: ${e.message}`;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Connection failed';
+      result.error = (result.error ? result.error + '; ' : '') + `SMTP: ${msg}`;
     }
 
     return result;

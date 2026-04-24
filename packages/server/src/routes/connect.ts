@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import os from 'os';
+import path from 'path';
 import { AuthRequest } from '../middleware/auth';
 import { validateStringLength, MAX_NAME_LENGTH, MAX_CONTENT_LENGTH } from '../middleware/validate';
+import { FileStore } from '../storage/store';
 
 interface ChannelRecord {
   id: string;
@@ -20,14 +23,14 @@ interface MessageRecord {
   sent_at: Date;
 }
 
-const channels = new Map<string, ChannelRecord>();
-const channelMessages = new Map<string, MessageRecord[]>();
+const channels = new FileStore<ChannelRecord>(path.join(os.homedir(), '.eoffice', 'data', 'channels'));
+const channelMessages = new FileStore<MessageRecord[]>(path.join(os.homedir(), '.eoffice', 'data', 'channel-messages'));
 
 export const connectRouter = Router();
 
 connectRouter.get('/channels', (req: Request, res: Response) => {
   const userId = (req as AuthRequest).user?.id;
-  const items = Array.from(channels.values()).filter((c) => c.ownerId === userId);
+  const items = channels.list().filter((c) => c.ownerId === userId);
   res.json({ channels: items, total: items.length });
 });
 

@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import os from 'os';
+import path from 'path';
 import { AuthRequest, pickFields } from '../middleware/auth';
 import { validateStringLength, MAX_TITLE_LENGTH } from '../middleware/validate';
+import { FileStore } from '../storage/store';
 
 interface SlideRecord {
   id: string;
@@ -20,13 +23,13 @@ interface PresentationRecord {
   ownerId: string;
 }
 
-const store = new Map<string, PresentationRecord>();
+const store = new FileStore<PresentationRecord>(path.join(os.homedir(), '.eoffice', 'data', 'presentations'));
 
 export const presentationsRouter = Router();
 
 presentationsRouter.get('/', (req: Request, res: Response) => {
   const userId = (req as AuthRequest).user?.id;
-  const items = Array.from(store.values()).filter((p) => p.ownerId === userId);
+  const items = store.list().filter((p) => p.ownerId === userId);
   res.json({ presentations: items, total: items.length });
 });
 
@@ -109,6 +112,7 @@ presentationsRouter.post('/:id/slides', (req: Request, res: Response) => {
   };
   pres.slides.push(slide);
   pres.updated_at = new Date();
+  store.set(pres.id, pres);
   res.status(201).json(slide);
 });
 
@@ -125,6 +129,7 @@ presentationsRouter.put('/:id/slides/:slideId', (req: Request, res: Response) =>
   const allowed = pickFields<SlideRecord>(req.body, ['content', 'notes', 'layout']);
   pres.slides[idx] = { ...pres.slides[idx], ...allowed };
   pres.updated_at = new Date();
+  store.set(pres.id, pres);
   res.json(pres.slides[idx]);
 });
 
@@ -137,6 +142,7 @@ presentationsRouter.delete('/:id/slides/:slideId', (req: Request, res: Response)
   }
   pres.slides = pres.slides.filter((s) => s.id !== req.params.slideId);
   pres.updated_at = new Date();
+  store.set(pres.id, pres);
   res.status(204).send();
 });
 
@@ -155,5 +161,6 @@ presentationsRouter.put('/:id/slides/reorder', (req: Request, res: Response) => 
     .map((id: string) => slideMap.get(id))
     .filter((s): s is SlideRecord => s !== undefined);
   pres.updated_at = new Date();
+  store.set(pres.id, pres);
   res.json(pres);
 });

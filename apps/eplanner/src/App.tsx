@@ -7,6 +7,7 @@ import GanttView from './components/GanttView';
 import TaskDetail from './components/TaskDetail';
 import EBotSidebar from './components/EBotSidebar';
 import StatusBar from './components/StatusBar';
+import InputDialog from '../../shared/InputDialog';
 import { usePlanner } from './hooks/usePlanner';
 import { useEBot } from './hooks/useEBot';
 
@@ -15,6 +16,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<PlannerView>('board');
   const [ebotOpen, setEbotOpen] = useState(false);
   const [ebotResponse, setEbotResponse] = useState('');
+  const [showAddColumn, setShowAddColumn] = useState(false);
 
   const planner = usePlanner();
   const { connected, loading, extractTasks, suggestPriority } = useEBot();
@@ -31,8 +33,12 @@ export default function App() {
   }, [planner]);
 
   const handleAddColumn = useCallback(() => {
-    const name = prompt('Column name:');
-    if (name?.trim()) planner.addColumn(name.trim());
+    setShowAddColumn(true);
+  }, []);
+
+  const handleCreateColumn = useCallback((name: string) => {
+    planner.addColumn(name);
+    setShowAddColumn(false);
   }, [planner]);
 
   const handleEBotAction = useCallback(
@@ -126,6 +132,16 @@ export default function App() {
           onClose={() => planner.setSelectedTaskId(null)}
         />
       )}
+
+      <InputDialog
+        open={showAddColumn}
+        title="Add Column"
+        label="Column Name"
+        placeholder="e.g., In Review"
+        onConfirm={handleCreateColumn}
+        onCancel={() => setShowAddColumn(false)}
+      />
+
       <StatusBar
         total={planner.counts.total}
         todo={planner.counts.todo}

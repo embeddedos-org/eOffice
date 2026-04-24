@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { API_URL } from '../../../shared/config';
 
 interface EBotSidebarProps {
   open: boolean;
@@ -36,7 +37,7 @@ export default function EBotSidebar({
             <div className="ebot-offline-icon">🔌</div>
             <div className="ebot-offline-title">eBot Offline</div>
             <div className="ebot-offline-desc">
-              Cannot connect to eBot server at http://localhost:3001.
+              Cannot connect to eBot server at {API_URL}.
             </div>
           </div>
         ) : (

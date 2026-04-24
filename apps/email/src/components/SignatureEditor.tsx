@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { sanitizeHtml } from '@eoffice/core';
 
 export interface EmailSignature {
   id: string;
@@ -141,7 +142,7 @@ export default function SignatureEditor({
               <div className="signature-preview-label">Preview</div>
               <div
                 className="signature-preview-content"
-                dangerouslySetInnerHTML={{ __html: editContent }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(editContent) }}
               />
             </div>
             <div className="signature-actions">

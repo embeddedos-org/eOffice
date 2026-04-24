@@ -64,8 +64,20 @@ export {
   escapeJson,
   debounce,
   sanitizeString,
+  sanitizeHtml,
+  isValidUrl,
   validateId,
 } from './utils';
+
+export {
+  exportToHtml,
+  exportToMarkdown,
+  exportToDocx,
+  exportToPdf,
+  exportToCsv,
+  exportToXlsx,
+  exportToPptx,
+} from './file-export';
 
 export {
   EBOT_DEFAULT_HOST,

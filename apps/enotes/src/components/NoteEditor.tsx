@@ -1,3 +1,4 @@
+import { sanitizeHtml } from '@eoffice/core';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Note } from '../App';
 
@@ -37,8 +38,13 @@ function renderMarkdown(text: string): string {
   html = html.replace(/^- (.*)/gm, '<li>$1</li>');
   html = html.replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`);
 
-  // Links
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+  // Links — only allow safe URL schemes
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, text, url) => {
+    if (/^(https?:|mailto:)/i.test(url)) {
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+    }
+    return text;
+  });
 
   // Line breaks
   html = html.replace(/\n/g, '<br/>');
@@ -251,7 +257,7 @@ export default function NoteEditor({ note, onUpdate }: NoteEditorProps) {
       ) : (
         <div
           className="note-content-rendered"
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderMarkdown(content)) }}
         />
       )}
 

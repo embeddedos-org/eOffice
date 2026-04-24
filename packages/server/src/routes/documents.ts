@@ -1,29 +1,37 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import type { Document } from '@eoffice/core';
+import { AuthRequest, pickFields } from '../middleware/auth';
+import { validateStringLength, MAX_TITLE_LENGTH, MAX_CONTENT_LENGTH } from '../middleware/validate';
 
-const store = new Map<string, Document>();
+interface OwnedDocument extends Document {
+  ownerId: string;
+}
+
+const store = new Map<string, OwnedDocument>();
 
 export const documentsRouter = Router();
 
-// GET /api/documents — list all documents
-documentsRouter.get('/', (_req: Request, res: Response) => {
-  const documents = Array.from(store.values());
+documentsRouter.get('/', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
+  const documents = Array.from(store.values()).filter((d) => d.ownerId === userId);
   res.json({ documents, total: documents.length });
 });
 
-// GET /api/documents/:id — get a document
 documentsRouter.get('/:id', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
   const doc = store.get(req.params.id);
-  if (!doc) {
-    res.status(404).json({ error: `Document not found: ${req.params.id}` });
+  if (!doc || doc.ownerId !== userId) {
+    res.status(404).json({ error: 'Document not found' });
     return;
   }
   res.json(doc);
 });
 
-// POST /api/documents — create a document
 documentsRouter.post('/', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
+  if (!userId) { res.status(401).json({ error: 'Authentication required' }); return; }
+
   const { title, content, app_id, tags } = req.body;
 
   if (!title || !app_id) {
@@ -31,36 +39,51 @@ documentsRouter.post('/', (req: Request, res: Response) => {
     return;
   }
 
+  const titleErr = validateStringLength(title, 'title', MAX_TITLE_LENGTH);
+  if (titleErr) { res.status(400).json({ error: titleErr }); return; }
+
+  if (content) {
+    const contentErr = validateStringLength(content, 'content', MAX_CONTENT_LENGTH);
+    if (contentErr) { res.status(400).json({ error: contentErr }); return; }
+  }
+
   const now = new Date();
-  const doc: Document = {
+  const doc: OwnedDocument = {
     id: crypto.randomUUID(),
     title,
     content: content ?? '',
     app_id,
     created_at: now,
     updated_at: now,
-    tags: tags ?? [],
+    tags: Array.isArray(tags) ? tags : [],
+    ownerId: userId,
   };
 
   store.set(doc.id, doc);
   res.status(201).json(doc);
 });
 
-// PUT /api/documents/:id — update a document
 documentsRouter.put('/:id', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
   const existing = store.get(req.params.id);
-  if (!existing) {
-    res.status(404).json({ error: `Document not found: ${req.params.id}` });
+  if (!existing || existing.ownerId !== userId) {
+    res.status(404).json({ error: 'Document not found' });
     return;
   }
 
-  const { title, content, app_id, tags } = req.body;
-  const updated: Document = {
+  const allowed = pickFields<OwnedDocument>(req.body, ['title', 'content', 'app_id', 'tags']);
+
+  if (allowed.title) {
+    const titleErr = validateStringLength(allowed.title, 'title', MAX_TITLE_LENGTH);
+    if (titleErr) { res.status(400).json({ error: titleErr }); return; }
+  }
+
+  const updated: OwnedDocument = {
     ...existing,
-    title: title ?? existing.title,
-    content: content ?? existing.content,
-    app_id: app_id ?? existing.app_id,
-    tags: tags ?? existing.tags,
+    title: (allowed.title as string) ?? existing.title,
+    content: (allowed.content as string) ?? existing.content,
+    app_id: (allowed.app_id as string) ?? existing.app_id,
+    tags: (allowed.tags as string[]) ?? existing.tags,
     updated_at: new Date(),
   };
 
@@ -68,10 +91,11 @@ documentsRouter.put('/:id', (req: Request, res: Response) => {
   res.json(updated);
 });
 
-// DELETE /api/documents/:id — delete a document
 documentsRouter.delete('/:id', (req: Request, res: Response) => {
-  if (!store.has(req.params.id)) {
-    res.status(404).json({ error: `Document not found: ${req.params.id}` });
+  const userId = (req as AuthRequest).user?.id;
+  const doc = store.get(req.params.id);
+  if (!doc || doc.ownerId !== userId) {
+    res.status(404).json({ error: 'Document not found' });
     return;
   }
   store.delete(req.params.id);

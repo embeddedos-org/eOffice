@@ -522,36 +522,53 @@ export class SpreadsheetModel {
   }
 
   private evalSimpleExpression(expr: string, sheetId: string): string | number {
-    const ref = this.parseCellRef(expr.trim());
+    const trimmed = expr.trim();
+
+    const ref = this.parseCellRef(trimmed);
     if (ref) {
-      return this.resolveValue(expr.trim(), sheetId);
+      return this.resolveValue(trimmed, sheetId);
     }
 
-    const num = Number(expr.trim());
-    if (!isNaN(num) && expr.trim().length > 0) return num;
+    const num = Number(trimmed);
+    if (!isNaN(num) && trimmed.length > 0) return num;
 
-    const addSub = expr.match(/^(.+?)([+-])([^+-]+)$/);
-    if (addSub) {
-      const left = this.evalSimpleExpression(addSub[1], sheetId);
-      const right = this.evalSimpleExpression(addSub[3], sheetId);
-      const l = typeof left === 'number' ? left : Number(left);
-      const r = typeof right === 'number' ? right : Number(right);
-      if (isNaN(l) || isNaN(r)) return '#ERROR!';
-      return addSub[2] === '+' ? l + r : l - r;
+    // Addition/subtraction (lowest precedence — split here first)
+    // Find the rightmost + or - that isn't inside a leading position
+    for (let i = trimmed.length - 1; i > 0; i--) {
+      const ch = trimmed[i];
+      if (ch === '+' || ch === '-') {
+        const left = trimmed.slice(0, i);
+        const right = trimmed.slice(i + 1);
+        if (left.trim() && right.trim()) {
+          const l = this.evalSimpleExpression(left, sheetId);
+          const r = this.evalSimpleExpression(right, sheetId);
+          const ln = typeof l === 'number' ? l : Number(l);
+          const rn = typeof r === 'number' ? r : Number(r);
+          if (isNaN(ln) || isNaN(rn)) return '#ERROR!';
+          return ch === '+' ? ln + rn : ln - rn;
+        }
+      }
     }
 
-    const mulDiv = expr.match(/^(.+?)([*/])([^*/]+)$/);
-    if (mulDiv) {
-      const left = this.evalSimpleExpression(mulDiv[1], sheetId);
-      const right = this.evalSimpleExpression(mulDiv[3], sheetId);
-      const l = typeof left === 'number' ? left : Number(left);
-      const r = typeof right === 'number' ? right : Number(right);
-      if (isNaN(l) || isNaN(r)) return '#ERROR!';
-      if (mulDiv[2] === '/' && r === 0) return '#ERROR!';
-      return mulDiv[2] === '*' ? l * r : l / r;
+    // Multiplication/division (higher precedence)
+    for (let i = trimmed.length - 1; i > 0; i--) {
+      const ch = trimmed[i];
+      if (ch === '*' || ch === '/') {
+        const left = trimmed.slice(0, i);
+        const right = trimmed.slice(i + 1);
+        if (left.trim() && right.trim()) {
+          const l = this.evalSimpleExpression(left, sheetId);
+          const r = this.evalSimpleExpression(right, sheetId);
+          const ln = typeof l === 'number' ? l : Number(l);
+          const rn = typeof r === 'number' ? r : Number(r);
+          if (isNaN(ln) || isNaN(rn)) return '#ERROR!';
+          if (ch === '/' && rn === 0) return '#ERROR!';
+          return ch === '*' ? ln * rn : ln / rn;
+        }
+      }
     }
 
-    return this.resolveValue(expr.trim(), sheetId);
+    return this.resolveValue(trimmed, sheetId);
   }
 
   // ── Helper methods ────────────────────────────────────────────────

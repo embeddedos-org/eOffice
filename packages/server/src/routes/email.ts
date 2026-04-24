@@ -8,6 +8,9 @@ import {
   getAccountWithPassword,
   removeAccount,
 } from '../services/email-config';
+import { AuthRequest } from '../middleware/auth';
+import { emailSendLimiter } from '../middleware/rate-limit';
+import { validateEmail, validateStringLength, MAX_TITLE_LENGTH, MAX_CONTENT_LENGTH, MAX_NAME_LENGTH } from '../middleware/validate';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 const activeServices = new Map<string, EmailService>();
@@ -21,6 +24,10 @@ emailRouter.post('/accounts', async (req: Request, res: Response) => {
     const { provider, email, password, imapHost, imapPort, smtpHost, smtpPort, useTLS } = req.body;
     if (!email || !password) {
       res.status(400).json({ error: 'email and password are required' });
+      return;
+    }
+    if (!validateEmail(email)) {
+      res.status(400).json({ error: 'Invalid email format' });
       return;
     }
 
@@ -37,8 +44,10 @@ emailRouter.post('/accounts', async (req: Request, res: Response) => {
     });
 
     res.status(201).json({ id: account.id, email: account.email, provider: account.provider });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Account creation failed';
+    console.error('Email account error:', message);
+    res.status(500).json({ error: 'Failed to create email account' });
   }
 });
 
@@ -71,8 +80,10 @@ emailRouter.post('/accounts/:id/test', async (req: Request, res: Response) => {
     const service = new EmailService(account);
     const result = await service.testConnection();
     res.json(result);
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Connection test failed';
+    console.error('Email test error:', message);
+    res.status(500).json({ error: 'Connection test failed' });
   }
 });
 
@@ -103,8 +114,10 @@ emailRouter.get('/folders', async (req: Request, res: Response) => {
     const service = await getService(accountId);
     const folders = await service.getFolders();
     res.json({ folders });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to get folders';
+    console.error('Email folders error:', message);
+    res.status(500).json({ error: 'Failed to get folders' });
   }
 });
 
@@ -115,11 +128,36 @@ emailRouter.post('/folders', async (req: Request, res: Response) => {
       res.status(400).json({ error: 'accountId and name are required' });
       return;
     }
+    const nameErr = validateStringLength(name, 'name', MAX_NAME_LENGTH);
+    if (nameErr) { res.status(400).json({ error: nameErr }); return; }
+
     const service = await getService(accountId);
     await service.createFolder(name);
     res.status(201).json({ name, created: true });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to create folder';
+    console.error('Email folder create error:', message);
+    res.status(500).json({ error: 'Failed to create folder' });
+  }
+});
+
+emailRouter.put('/folders/rename', async (req: Request, res: Response) => {
+  try {
+    const { accountId, oldName, newName } = req.body;
+    if (!accountId || !oldName || !newName) {
+      res.status(400).json({ error: 'accountId, oldName, and newName are required' });
+      return;
+    }
+    const nameErr = validateStringLength(newName, 'newName', MAX_NAME_LENGTH);
+    if (nameErr) { res.status(400).json({ error: nameErr }); return; }
+
+    const service = await getService(accountId);
+    await service.renameFolder(oldName, newName);
+    res.json({ oldName, newName, renamed: true });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to rename folder';
+    console.error('Email folder rename error:', message);
+    res.status(500).json({ error: 'Failed to rename folder' });
   }
 });
 
@@ -134,8 +172,10 @@ emailRouter.delete('/folders', async (req: Request, res: Response) => {
     const service = await getService(accountId);
     await service.deleteFolder(name);
     res.status(204).send();
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to delete folder';
+    console.error('Email folder delete error:', message);
+    res.status(500).json({ error: 'Failed to delete folder' });
   }
 });
 
@@ -146,7 +186,7 @@ emailRouter.get('/messages', async (req: Request, res: Response) => {
     const accountId = req.query.accountId as string;
     const folder = (req.query.folder as string) || 'INBOX';
     const page = parseInt(req.query.page as string) || 1;
-    const pageSize = parseInt(req.query.pageSize as string) || 50;
+    const pageSize = Math.min(parseInt(req.query.pageSize as string) || 50, 100);
 
     if (!accountId) {
       res.json({ messages: [], total: 0 });
@@ -156,12 +196,14 @@ emailRouter.get('/messages', async (req: Request, res: Response) => {
     const service = await getService(accountId);
     const result = await service.getMessages(folder, page, pageSize);
     res.json(result);
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to get messages';
+    console.error('Email messages error:', message);
+    res.status(500).json({ error: 'Failed to get messages' });
   }
 });
 
-emailRouter.post('/messages/send', upload.array('attachments', 10), async (req: Request, res: Response) => {
+emailRouter.post('/messages/send', emailSendLimiter, upload.array('attachments', 10), async (req: Request, res: Response) => {
   try {
     const { accountId, to, subject, body, html, cc, bcc } = req.body;
     if (!accountId || !to || !subject) {
@@ -169,7 +211,7 @@ emailRouter.post('/messages/send', upload.array('attachments', 10), async (req: 
       return;
     }
 
-    const files = (req as any).files as Express.Multer.File[] | undefined;
+    const files = (req as AuthRequest & { files?: Express.Multer.File[] }).files;
     const attachments = files?.map((f) => ({
       filename: f.originalname,
       content: f.buffer,
@@ -179,8 +221,10 @@ emailRouter.post('/messages/send', upload.array('attachments', 10), async (req: 
     const service = await getService(accountId);
     const result = await service.sendMessage(to, subject, body || '', html, attachments, cc, bcc);
     res.status(201).json(result);
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to send message';
+    console.error('Email send error:', message);
+    res.status(500).json({ error: 'Failed to send message' });
   }
 });
 
@@ -191,39 +235,27 @@ emailRouter.post('/messages/move', async (req: Request, res: Response) => {
       res.status(400).json({ error: 'accountId, uid, fromFolder, and toFolder are required' });
       return;
     }
+    const parsedUid = parseInt(uid);
+    if (isNaN(parsedUid)) {
+      res.status(400).json({ error: 'uid must be a number' });
+      return;
+    }
     const service = await getService(accountId);
-    await service.moveMessage(parseInt(uid), fromFolder, toFolder);
+    await service.moveMessage(parsedUid, fromFolder, toFolder);
     res.json({ moved: true });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to move message';
+    console.error('Email move error:', message);
+    res.status(500).json({ error: 'Failed to move message' });
   }
-});
-
-// Legacy POST /messages endpoint
-emailRouter.post('/messages', (req: Request, res: Response) => {
-  const { to, subject, body, from } = req.body;
-  if (!to || !subject) {
-    res.status(400).json({ error: 'to and subject are required' });
-    return;
-  }
-  const msg = {
-    id: crypto.randomUUID(),
-    from: from ?? 'me@eoffice.local',
-    to,
-    subject,
-    body: body ?? '',
-    read: false,
-    starred: false,
-    sent_at: new Date(),
-  };
-  res.status(201).json(msg);
 });
 
 emailRouter.put('/messages/:id/read', async (req: Request, res: Response) => {
   try {
     const { accountId, folder } = req.body;
     const uid = parseInt(req.params.id);
-    const read = req.body.read ?? true;
+    if (isNaN(uid)) { res.status(400).json({ error: 'Invalid message id' }); return; }
+    const read = req.body.read === true;
 
     if (!accountId) {
       res.json({ id: req.params.id, read });
@@ -233,8 +265,10 @@ emailRouter.put('/messages/:id/read', async (req: Request, res: Response) => {
     const service = await getService(accountId);
     await service.markRead(folder || 'INBOX', uid, read);
     res.json({ id: req.params.id, uid, read });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to update read status';
+    console.error('Email read error:', message);
+    res.status(500).json({ error: 'Failed to update read status' });
   }
 });
 
@@ -242,17 +276,20 @@ emailRouter.put('/messages/:id/star', async (req: Request, res: Response) => {
   try {
     const { accountId, folder, starred } = req.body;
     const uid = parseInt(req.params.id);
+    if (isNaN(uid)) { res.status(400).json({ error: 'Invalid message id' }); return; }
 
     if (!accountId) {
-      res.json({ id: req.params.id, starred: starred ?? true });
+      res.json({ id: req.params.id, starred: starred === true });
       return;
     }
 
     const service = await getService(accountId);
-    await service.toggleStar(folder || 'INBOX', uid, starred ?? true);
+    await service.toggleStar(folder || 'INBOX', uid, starred === true);
     res.json({ id: req.params.id, uid, starred });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to toggle star';
+    console.error('Email star error:', message);
+    res.status(500).json({ error: 'Failed to toggle star' });
   }
 });
 
@@ -261,6 +298,7 @@ emailRouter.delete('/messages/:id', async (req: Request, res: Response) => {
     const accountId = req.query.accountId as string;
     const folder = (req.query.folder as string) || 'INBOX';
     const uid = parseInt(req.params.id);
+    if (isNaN(uid)) { res.status(400).json({ error: 'Invalid message id' }); return; }
 
     if (!accountId) {
       res.status(204).send();
@@ -270,8 +308,10 @@ emailRouter.delete('/messages/:id', async (req: Request, res: Response) => {
     const service = await getService(accountId);
     await service.moveToTrash(folder, uid);
     res.status(204).send();
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Failed to delete message';
+    console.error('Email delete error:', message);
+    res.status(500).json({ error: 'Failed to delete message' });
   }
 });
 
@@ -291,112 +331,166 @@ emailRouter.get('/search', async (req: Request, res: Response) => {
     const service = await getService(accountId);
     const results = await service.searchMessages(query, folder);
     res.json({ messages: results, total: results.length });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Search failed';
+    console.error('Email search error:', message);
+    res.status(500).json({ error: 'Search failed' });
   }
 });
 
 // --- Contacts ---
 
-const contactsStore = new Map<string, any[]>();
+interface Contact {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+  ownerId: string;
+}
+
+const contactsStore = new Map<string, Contact>();
 
 emailRouter.get('/contacts', (req: Request, res: Response) => {
-  const accountId = req.query.accountId as string || 'default';
-  const contacts = contactsStore.get(accountId) || [];
+  const userId = (req as AuthRequest).user?.id;
+  const contacts = Array.from(contactsStore.values()).filter((c) => c.ownerId === userId);
   res.json({ contacts });
 });
 
 emailRouter.post('/contacts', (req: Request, res: Response) => {
-  const { accountId = 'default', name, email } = req.body;
+  const userId = (req as AuthRequest).user?.id;
+  if (!userId) { res.status(401).json({ error: 'Authentication required' }); return; }
+
+  const { name, email } = req.body;
   if (!email) {
     res.status(400).json({ error: 'email is required' });
     return;
   }
-  const contacts = contactsStore.get(accountId) || [];
-  const contact = {
+  if (!validateEmail(email)) {
+    res.status(400).json({ error: 'Invalid email format' });
+    return;
+  }
+
+  const contact: Contact = {
     id: crypto.randomUUID(),
-    name: name || email.split('@')[0],
+    name: typeof name === 'string' ? name : email.split('@')[0],
     email,
     createdAt: new Date().toISOString(),
+    ownerId: userId,
   };
-  contacts.push(contact);
-  contactsStore.set(accountId, contacts);
+  contactsStore.set(contact.id, contact);
   res.status(201).json(contact);
 });
 
 emailRouter.delete('/contacts/:id', (req: Request, res: Response) => {
-  const accountId = (req.query.accountId as string) || 'default';
-  const contacts = contactsStore.get(accountId) || [];
-  const filtered = contacts.filter((c) => c.id !== req.params.id);
-  if (filtered.length === contacts.length) {
+  const userId = (req as AuthRequest).user?.id;
+  const contact = contactsStore.get(req.params.id);
+  if (!contact || contact.ownerId !== userId) {
     res.status(404).json({ error: 'Contact not found' });
     return;
   }
-  contactsStore.set(accountId, filtered);
+  contactsStore.delete(req.params.id);
   res.status(204).send();
 });
 
 // --- Signatures ---
 
-const signaturesStore = new Map<string, any[]>();
+interface Signature {
+  id: string;
+  name: string;
+  content: string;
+  isDefault: boolean;
+  createdAt: string;
+  ownerId: string;
+}
+
+const signaturesStore = new Map<string, Signature>();
 
 emailRouter.get('/signatures', (req: Request, res: Response) => {
-  const accountId = (req.query.accountId as string) || 'default';
-  const signatures = signaturesStore.get(accountId) || [];
+  const userId = (req as AuthRequest).user?.id;
+  const signatures = Array.from(signaturesStore.values()).filter((s) => s.ownerId === userId);
   res.json({ signatures });
 });
 
 emailRouter.post('/signatures', (req: Request, res: Response) => {
-  const { accountId = 'default', name, content, isDefault } = req.body;
+  const userId = (req as AuthRequest).user?.id;
+  if (!userId) { res.status(401).json({ error: 'Authentication required' }); return; }
+
+  const { name, content, isDefault } = req.body;
   if (!name || !content) {
     res.status(400).json({ error: 'name and content are required' });
     return;
   }
-  const signatures = signaturesStore.get(accountId) || [];
+  const nameErr = validateStringLength(name, 'name', MAX_NAME_LENGTH);
+  if (nameErr) { res.status(400).json({ error: nameErr }); return; }
+  const contentErr = validateStringLength(content, 'content', MAX_CONTENT_LENGTH);
+  if (contentErr) { res.status(400).json({ error: contentErr }); return; }
+
+  const userSigs = Array.from(signaturesStore.values()).filter((s) => s.ownerId === userId);
   if (isDefault) {
-    signatures.forEach((s) => (s.isDefault = false));
+    userSigs.forEach((s) => { s.isDefault = false; });
   }
-  const sig = {
+
+  const sig: Signature = {
     id: crypto.randomUUID(),
     name,
     content,
-    isDefault: isDefault || signatures.length === 0,
+    isDefault: isDefault || userSigs.length === 0,
     createdAt: new Date().toISOString(),
+    ownerId: userId,
   };
-  signatures.push(sig);
-  signaturesStore.set(accountId, signatures);
+  signaturesStore.set(sig.id, sig);
   res.status(201).json(sig);
 });
 
 // --- Calendar events ---
 
-const events = new Map<string, any>();
+interface CalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string | null;
+  attendees: string[];
+  created_at: Date;
+  ownerId: string;
+}
 
-emailRouter.get('/events', (_req: Request, res: Response) => {
-  const items = Array.from(events.values());
+const events = new Map<string, CalendarEvent>();
+
+emailRouter.get('/events', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
+  const items = Array.from(events.values()).filter((e) => e.ownerId === userId);
   res.json({ events: items, total: items.length });
 });
 
 emailRouter.post('/events', (req: Request, res: Response) => {
-  const { title, start, end } = req.body;
+  const userId = (req as AuthRequest).user?.id;
+  if (!userId) { res.status(401).json({ error: 'Authentication required' }); return; }
+
+  const { title, start, end, attendees } = req.body;
   if (!title || !start) {
     res.status(400).json({ error: 'title and start are required' });
     return;
   }
-  const evt = {
+  const titleErr = validateStringLength(title, 'title', MAX_TITLE_LENGTH);
+  if (titleErr) { res.status(400).json({ error: titleErr }); return; }
+
+  const evt: CalendarEvent = {
     id: crypto.randomUUID(),
     title,
     start,
-    end: end ?? null,
-    attendees: req.body.attendees ?? [],
+    end: typeof end === 'string' ? end : null,
+    attendees: Array.isArray(attendees) ? attendees.filter((a: unknown) => typeof a === 'string') : [],
     created_at: new Date(),
+    ownerId: userId,
   };
   events.set(evt.id, evt);
   res.status(201).json(evt);
 });
 
 emailRouter.delete('/events/:id', (req: Request, res: Response) => {
-  if (!events.has(req.params.id)) {
+  const userId = (req as AuthRequest).user?.id;
+  const evt = events.get(req.params.id);
+  if (!evt || evt.ownerId !== userId) {
     res.status(404).json({ error: 'Event not found' });
     return;
   }

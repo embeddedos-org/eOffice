@@ -1,40 +1,123 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'eoffice-dev-secret';
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  const secret = crypto.randomBytes(64).toString('hex');
+  console.warn('CRITICAL: No JWT_SECRET env var set. Using random secret — tokens will not survive restarts.');
+  return secret;
+})();
+
+const TOKEN_EXPIRY_ACCESS = 60 * 60 * 1000; // 1 hour
+const TOKEN_EXPIRY_REFRESH = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+const PASSWORD_MIN_LENGTH = 8;
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+}
+
+export interface AuthRequest extends Request {
+  user?: AuthUser;
+}
 
 interface UserRecord {
   id: string;
   username: string;
   email: string;
   passwordHash: string;
+  salt: string;
   role: string;
 }
 
 const users = new Map<string, UserRecord>();
 
-function simpleHash(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.charCodeAt(i);
-    hash = (hash << 5) - hash + ch;
-    hash |= 0;
-  }
-  return Math.abs(hash).toString(36);
+// --- Password hashing with scrypt (Node.js built-in) ---
+
+async function hashPassword(password: string): Promise<{ hash: string; salt: string }> {
+  const salt = crypto.randomBytes(32).toString('hex');
+  const hash = await new Promise<string>((resolve, reject) => {
+    crypto.scrypt(password, salt, 64, (err, derivedKey) => {
+      if (err) reject(err);
+      else resolve(derivedKey.toString('hex'));
+    });
+  });
+  return { hash, salt };
 }
 
-function createToken(payload: object): string {
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  const body = Buffer.from(JSON.stringify({ ...payload, iat: Date.now() })).toString('base64url');
-  const sig = Buffer.from(simpleHash(header + '.' + body + JWT_SECRET)).toString('base64url');
-  return `${header}.${body}.${sig}`;
+async function verifyPassword(password: string, hash: string, salt: string): Promise<boolean> {
+  const derived = await new Promise<string>((resolve, reject) => {
+    crypto.scrypt(password, salt, 64, (err, derivedKey) => {
+      if (err) reject(err);
+      else resolve(derivedKey.toString('hex'));
+    });
+  });
+  return crypto.timingSafeEqual(Buffer.from(derived, 'hex'), Buffer.from(hash, 'hex'));
+}
+
+function validatePasswordStrength(password: string): string | null {
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return `Password must be at least ${PASSWORD_MIN_LENGTH} characters`;
+  }
+  if (!/\d/.test(password)) {
+    return 'Password must contain at least 1 number';
+  }
+  return null;
+}
+
+// --- HMAC-SHA256 JWT ---
+
+function base64UrlEncode(data: string): string {
+  return Buffer.from(data).toString('base64url');
+}
+
+function base64UrlDecode(str: string): string {
+  return Buffer.from(str, 'base64url').toString();
+}
+
+function createToken(payload: Record<string, unknown>, expiresInMs: number = TOKEN_EXPIRY_ACCESS): string {
+  const header = base64UrlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const now = Date.now();
+  const body = base64UrlEncode(JSON.stringify({
+    ...payload,
+    iat: now,
+    exp: now + expiresInMs,
+  }));
+  const signature = crypto
+    .createHmac('sha256', JWT_SECRET)
+    .update(`${header}.${body}`)
+    .digest('base64url');
+  return `${header}.${body}.${signature}`;
+}
+
+function createRefreshToken(payload: Record<string, unknown>): string {
+  return createToken(payload, TOKEN_EXPIRY_REFRESH);
 }
 
 function verifyToken(token: string): Record<string, unknown> | null {
   try {
-    const [header, body, sig] = token.split('.');
-    const expectedSig = Buffer.from(simpleHash(header + '.' + body + JWT_SECRET)).toString('base64url');
-    if (sig !== expectedSig) return null;
-    return JSON.parse(Buffer.from(body, 'base64url').toString());
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const [header, body, signature] = parts;
+
+    const expectedSig = crypto
+      .createHmac('sha256', JWT_SECRET)
+      .update(`${header}.${body}`)
+      .digest('base64url');
+
+    if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig))) {
+      return null;
+    }
+
+    const payload = JSON.parse(base64UrlDecode(body));
+
+    if (payload.exp && Date.now() > payload.exp) {
+      return null;
+    }
+
+    return payload;
   } catch {
     return null;
   }
@@ -52,13 +135,18 @@ function authenticateToken(req: Request, res: Response, next: NextFunction): voi
     res.status(403).json({ error: 'Invalid or expired token' });
     return;
   }
-  (req as any).user = payload;
+  (req as AuthRequest).user = {
+    id: payload.id as string,
+    username: payload.username as string,
+    email: payload.email as string,
+    role: payload.role as string,
+  };
   next();
 }
 
 function authorizeRole(...roles: string[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const user = (req as any).user;
+    const user = (req as AuthRequest).user;
     if (!user || !roles.includes(user.role)) {
       res.status(403).json({ error: 'Insufficient permissions' });
       return;
@@ -67,4 +155,30 @@ function authorizeRole(...roles: string[]) {
   };
 }
 
-export { users, createToken, simpleHash, verifyToken, authenticateToken, authorizeRole };
+// --- Utility: pick allowed fields from an object ---
+
+function pickFields<T extends Record<string, unknown>>(
+  body: Record<string, unknown>,
+  allowedFields: string[],
+): Partial<T> {
+  const result: Record<string, unknown> = {};
+  for (const field of allowedFields) {
+    if (field in body) {
+      result[field] = body[field];
+    }
+  }
+  return result as Partial<T>;
+}
+
+export {
+  users,
+  createToken,
+  createRefreshToken,
+  verifyToken,
+  hashPassword,
+  verifyPassword,
+  validatePasswordStrength,
+  authenticateToken,
+  authorizeRole,
+  pickFields,
+};

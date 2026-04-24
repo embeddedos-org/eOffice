@@ -8,7 +8,7 @@ import StatusBar from './components/StatusBar';
 import PresenterView from './components/PresenterView';
 import { usePresentation } from './hooks/usePresentation';
 import { useEBot } from './hooks/useEBot';
-import { exportToPptx } from '../../../packages/core/src/file-export';
+import { exportToPptx } from '@eoffice/core';
 
 export default function App() {
   const [title, setTitle] = useState('Untitled Presentation');
@@ -71,7 +71,8 @@ export default function App() {
             if (!slideContent.trim()) {
               response = '⚠️ Add content to the current slide first.';
             } else {
-              response = `💡 **Improvement Suggestions**\n\nConsider:\n- Adding a visual element\n- Making bullet points more concise\n- Adding a relevant statistic`;
+              response = await suggestContent(slideContent, 1);
+              response = `💡 **Improvement Suggestions**\n\n${response}`;
             }
             break;
           }

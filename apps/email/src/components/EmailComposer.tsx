@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { sanitizeHtml } from '@eoffice/core';
 import type { EmailSignature } from './SignatureEditor';
 
 interface EmailComposerProps {
@@ -302,7 +303,7 @@ export default function EmailComposer({
             ref={editorRef}
             className="composer-richtext-editor"
             contentEditable
-            dangerouslySetInnerHTML={{ __html: body }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(body) }}
             onInput={() => {
               setAiStatus('');
               setAiResult('');

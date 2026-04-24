@@ -136,28 +136,84 @@ function htmlToMarkdown(html: string): string {
     .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n\n')
     .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n\n')
     .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n\n')
+    .replace(/<h4[^>]*>(.*?)<\/h4>/gi, '#### $1\n\n')
     .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
     .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
     .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
     .replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*')
     .replace(/<u[^>]*>(.*?)<\/u>/gi, '__$1__')
+    .replace(/<a\s+href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)')
+    .replace(/<img\s+src="([^"]*)"[^>]*alt="([^"]*)"[^>]*\/?>/gi, '![$2]($1)')
+    .replace(/<img\s+src="([^"]*)"[^>]*\/?>/gi, '![]($1)')
+    .replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gi, '> $1\n\n')
+    .replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`')
+    .replace(/<pre[^>]*>(.*?)<\/pre>/gi, '```\n$1\n```\n\n')
     .replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
+    .replace(/<\/?(ul|ol)[^>]*>/gi, '\n')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n')
     .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
 function htmlToWordXml(html: string): string {
-  const lines = html
+  const paragraphs: string[] = [];
+
+  // Process paragraph by paragraph
+  const blocks = html
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .split('\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .split(/\n+/)
     .filter((l) => l.trim());
 
-  return lines.map((line) =>
-    `<w:p><w:r><w:t>${escXml(line.trim())}</w:t></w:r></w:p>`
-  ).join('\n');
+  for (const block of blocks) {
+    let text = block;
+    const runs: string[] = [];
+
+    // Extract inline formatting
+    text = text.replace(/<[^>]+>/g, (tag) => {
+      if (/<b\b|<strong\b/i.test(tag)) return '{{B_START}}';
+      if (/<\/b>|<\/strong>/i.test(tag)) return '{{B_END}}';
+      if (/<i\b|<em\b/i.test(tag)) return '{{I_START}}';
+      if (/<\/i>|<\/em>/i.test(tag)) return '{{I_END}}';
+      if (/<li\b/i.test(tag)) return '• ';
+      return '';
+    });
+
+    // Simple run generation
+    const parts = text.split(/({{[A-Z_]+}})/);
+    let bold = false;
+    let italic = false;
+
+    for (const part of parts) {
+      if (part === '{{B_START}}') { bold = true; continue; }
+      if (part === '{{B_END}}') { bold = false; continue; }
+      if (part === '{{I_START}}') { italic = true; continue; }
+      if (part === '{{I_END}}') { italic = false; continue; }
+      if (!part.trim()) continue;
+
+      let rPr = '';
+      if (bold || italic) {
+        rPr = '<w:rPr>';
+        if (bold) rPr += '<w:b/>';
+        if (italic) rPr += '<w:i/>';
+        rPr += '</w:rPr>';
+      }
+      runs.push(`<w:r>${rPr}<w:t xml:space="preserve">${escXml(part)}</w:t></w:r>`);
+    }
+
+    if (runs.length > 0) {
+      paragraphs.push(`<w:p>${runs.join('')}</w:p>`);
+    }
+  }
+
+  return paragraphs.join('\n');
 }

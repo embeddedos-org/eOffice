@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import { AuthRequest } from '../middleware/auth';
+import { validateStringLength, MAX_TITLE_LENGTH } from '../middleware/validate';
 
 interface CellData {
   value: string;
@@ -20,62 +22,68 @@ interface StoredSpreadsheet {
   activeSheetId: string;
   created_at: Date;
   updated_at: Date;
+  ownerId: string;
 }
 
 const store = new Map<string, StoredSpreadsheet>();
 export const spreadsheetsRouter = Router();
 
-// List all spreadsheets
-spreadsheetsRouter.get('/', (_req: Request, res: Response) => {
-  const spreadsheets = Array.from(store.values());
+spreadsheetsRouter.get('/', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
+  const spreadsheets = Array.from(store.values()).filter((s) => s.ownerId === userId);
   res.json({ spreadsheets, total: spreadsheets.length });
 });
 
-// Create a new spreadsheet
 spreadsheetsRouter.post('/', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
+  if (!userId) { res.status(401).json({ error: 'Authentication required' }); return; }
+
   const { title } = req.body;
   if (!title) {
-    return res.status(400).json({ error: 'title is required' });
+    res.status(400).json({ error: 'title is required' });
+    return;
   }
+
+  const titleErr = validateStringLength(title, 'title', MAX_TITLE_LENGTH);
+  if (titleErr) { res.status(400).json({ error: titleErr }); return; }
 
   const defaultSheetId = crypto.randomUUID();
   const spreadsheet: StoredSpreadsheet = {
     id: crypto.randomUUID(),
     title,
-    sheets: [
-      {
-        id: defaultSheetId,
-        name: 'Sheet1',
-        cells: {},
-      },
-    ],
+    sheets: [{ id: defaultSheetId, name: 'Sheet1', cells: {} }],
     activeSheetId: defaultSheetId,
     created_at: new Date(),
     updated_at: new Date(),
+    ownerId: userId,
   };
 
   store.set(spreadsheet.id, spreadsheet);
   res.status(201).json(spreadsheet);
 });
 
-// Get spreadsheet by ID
 spreadsheetsRouter.get('/:id', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
   const spreadsheet = store.get(req.params.id);
-  if (!spreadsheet) {
-    return res.status(404).json({ error: 'Spreadsheet not found' });
+  if (!spreadsheet || spreadsheet.ownerId !== userId) {
+    res.status(404).json({ error: 'Spreadsheet not found' });
+    return;
   }
   res.json(spreadsheet);
 });
 
-// Update spreadsheet metadata (title)
 spreadsheetsRouter.put('/:id', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
   const spreadsheet = store.get(req.params.id);
-  if (!spreadsheet) {
-    return res.status(404).json({ error: 'Spreadsheet not found' });
+  if (!spreadsheet || spreadsheet.ownerId !== userId) {
+    res.status(404).json({ error: 'Spreadsheet not found' });
+    return;
   }
 
   const { title } = req.body;
-  if (title) {
+  if (typeof title === 'string') {
+    const titleErr = validateStringLength(title, 'title', MAX_TITLE_LENGTH);
+    if (titleErr) { res.status(400).json({ error: titleErr }); return; }
     spreadsheet.title = title;
   }
   spreadsheet.updated_at = new Date();
@@ -83,40 +91,43 @@ spreadsheetsRouter.put('/:id', (req: Request, res: Response) => {
   res.json(spreadsheet);
 });
 
-// Delete spreadsheet
 spreadsheetsRouter.delete('/:id', (req: Request, res: Response) => {
-  if (!store.has(req.params.id)) {
-    return res.status(404).json({ error: 'Spreadsheet not found' });
+  const userId = (req as AuthRequest).user?.id;
+  const spreadsheet = store.get(req.params.id);
+  if (!spreadsheet || spreadsheet.ownerId !== userId) {
+    res.status(404).json({ error: 'Spreadsheet not found' });
+    return;
   }
   store.delete(req.params.id);
   res.status(204).send();
 });
 
-// Batch cell update
 spreadsheetsRouter.put('/:id/cells', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
   const spreadsheet = store.get(req.params.id);
-  if (!spreadsheet) {
-    return res.status(404).json({ error: 'Spreadsheet not found' });
+  if (!spreadsheet || spreadsheet.ownerId !== userId) {
+    res.status(404).json({ error: 'Spreadsheet not found' });
+    return;
   }
 
   const { sheetId, cells } = req.body;
   if (!sheetId || !Array.isArray(cells)) {
-    return res
-      .status(400)
-      .json({ error: 'sheetId and cells array are required' });
+    res.status(400).json({ error: 'sheetId and cells array are required' });
+    return;
   }
 
   const sheet = spreadsheet.sheets.find((s) => s.id === sheetId);
   if (!sheet) {
-    return res.status(404).json({ error: 'Sheet not found' });
+    res.status(404).json({ error: 'Sheet not found' });
+    return;
   }
 
   for (const cell of cells) {
-    const { row, col, value } = cell;
-    const key = `${row}:${col}`;
+    if (typeof cell.row !== 'number' || typeof cell.col !== 'number') continue;
+    const key = `${cell.row}:${cell.col}`;
     sheet.cells[key] = {
-      value,
-      formula: cell.formula,
+      value: typeof cell.value === 'string' ? cell.value : String(cell.value ?? ''),
+      formula: typeof cell.formula === 'string' ? cell.formula : undefined,
       computedValue: cell.computedValue,
     };
   }
@@ -126,16 +137,18 @@ spreadsheetsRouter.put('/:id/cells', (req: Request, res: Response) => {
   res.json(spreadsheet);
 });
 
-// Add a new sheet
 spreadsheetsRouter.post('/:id/sheets', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
   const spreadsheet = store.get(req.params.id);
-  if (!spreadsheet) {
-    return res.status(404).json({ error: 'Spreadsheet not found' });
+  if (!spreadsheet || spreadsheet.ownerId !== userId) {
+    res.status(404).json({ error: 'Spreadsheet not found' });
+    return;
   }
 
   const { name } = req.body;
-  if (!name) {
-    return res.status(400).json({ error: 'name is required' });
+  if (!name || typeof name !== 'string') {
+    res.status(400).json({ error: 'name is required' });
+    return;
   }
 
   const newSheet: Sheet = {
@@ -150,34 +163,30 @@ spreadsheetsRouter.post('/:id/sheets', (req: Request, res: Response) => {
   res.status(201).json(newSheet);
 });
 
-// Remove a sheet
-spreadsheetsRouter.delete(
-  '/:id/sheets/:sheetId',
-  (req: Request, res: Response) => {
-    const spreadsheet = store.get(req.params.id);
-    if (!spreadsheet) {
-      return res.status(404).json({ error: 'Spreadsheet not found' });
-    }
+spreadsheetsRouter.delete('/:id/sheets/:sheetId', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
+  const spreadsheet = store.get(req.params.id);
+  if (!spreadsheet || spreadsheet.ownerId !== userId) {
+    res.status(404).json({ error: 'Spreadsheet not found' });
+    return;
+  }
 
-    const sheetIndex = spreadsheet.sheets.findIndex(
-      (s) => s.id === req.params.sheetId,
-    );
-    if (sheetIndex === -1) {
-      return res.status(404).json({ error: 'Sheet not found' });
-    }
+  const sheetIndex = spreadsheet.sheets.findIndex((s) => s.id === req.params.sheetId);
+  if (sheetIndex === -1) {
+    res.status(404).json({ error: 'Sheet not found' });
+    return;
+  }
 
-    if (spreadsheet.sheets.length <= 1) {
-      return res
-        .status(400)
-        .json({ error: 'Cannot delete the last sheet' });
-    }
+  if (spreadsheet.sheets.length <= 1) {
+    res.status(400).json({ error: 'Cannot delete the last sheet' });
+    return;
+  }
 
-    spreadsheet.sheets.splice(sheetIndex, 1);
-    if (spreadsheet.activeSheetId === req.params.sheetId) {
-      spreadsheet.activeSheetId = spreadsheet.sheets[0].id;
-    }
-    spreadsheet.updated_at = new Date();
-    store.set(spreadsheet.id, spreadsheet);
-    res.status(204).send();
-  },
-);
+  spreadsheet.sheets.splice(sheetIndex, 1);
+  if (spreadsheet.activeSheetId === req.params.sheetId) {
+    spreadsheet.activeSheetId = spreadsheet.sheets[0].id;
+  }
+  spreadsheet.updated_at = new Date();
+  store.set(spreadsheet.id, spreadsheet);
+  res.status(204).send();
+});

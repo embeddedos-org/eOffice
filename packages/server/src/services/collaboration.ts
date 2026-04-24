@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
 import crypto from 'crypto';
+import { verifyToken } from '../middleware/auth';
 
 interface CollabUser {
   id: string;
@@ -21,18 +22,43 @@ const rooms = new Map<string, CollabRoom>();
 const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 let colorIdx = 0;
 
-export function setupCollaboration(server: http.Server): void {
-  const wss = new WebSocketServer({ server, path: '/ws/collab' });
+const MAX_ROOMS = 50;
+const MAX_USERS_PER_ROOM = 20;
+const MAX_MESSAGE_SIZE = 64 * 1024; // 64KB
 
-  wss.on('connection', (ws: WebSocket) => {
+export function setupCollaboration(server: http.Server): WebSocketServer {
+  const wss = new WebSocketServer({ server, path: '/ws/collab', maxPayload: MAX_MESSAGE_SIZE });
+
+  wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
+    // Authenticate via query param token
+    const url = new URL(req.url || '', `http://${req.headers.host}`);
+    const token = url.searchParams.get('token');
+    const payload = token ? verifyToken(token) : null;
+
+    if (!payload) {
+      ws.close(4001, 'Authentication required');
+      return;
+    }
+
     let userId = '';
     let currentRoom = '';
+    const userName = (payload.username as string) || 'Anonymous';
 
     ws.on('message', (data: Buffer) => {
+      if (data.length > MAX_MESSAGE_SIZE) {
+        ws.close(4002, 'Message too large');
+        return;
+      }
+
       try {
         const msg = JSON.parse(data.toString());
         switch (msg.type) {
           case 'join': {
+            if (rooms.size >= MAX_ROOMS && !rooms.has(msg.docId)) {
+              ws.send(JSON.stringify({ type: 'error', message: 'Maximum room limit reached' }));
+              return;
+            }
+
             userId = crypto.randomUUID().slice(0, 8);
             currentRoom = msg.docId;
             const color = COLORS[colorIdx++ % COLORS.length];
@@ -47,9 +73,14 @@ export function setupCollaboration(server: http.Server): void {
             }
 
             const room = rooms.get(currentRoom)!;
-            room.users.set(userId, { id: userId, name: msg.name || `User ${userId}`, color, ws });
 
-            // Send current state to joining user
+            if (room.users.size >= MAX_USERS_PER_ROOM) {
+              ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));
+              return;
+            }
+
+            room.users.set(userId, { id: userId, name: userName, color, ws });
+
             ws.send(JSON.stringify({
               type: 'init',
               userId,
@@ -61,10 +92,9 @@ export function setupCollaboration(server: http.Server): void {
               })),
             }));
 
-            // Notify others
             broadcast(room, userId, {
               type: 'user-joined',
-              user: { id: userId, name: msg.name || `User ${userId}`, color },
+              user: { id: userId, name: userName, color },
             });
             break;
           }
@@ -116,7 +146,6 @@ export function setupCollaboration(server: http.Server): void {
         room.users.delete(userId);
         broadcast(room, userId, { type: 'user-left', userId });
         if (room.users.size === 0) {
-          // Keep room alive for 5 minutes after last user leaves
           setTimeout(() => {
             const r = rooms.get(currentRoom);
             if (r && r.users.size === 0) rooms.delete(currentRoom);
@@ -126,8 +155,8 @@ export function setupCollaboration(server: http.Server): void {
     });
   });
 
-  // eslint-disable-next-line no-console
   console.log('  WebSocket collaboration server ready at /ws/collab');
+  return wss;
 }
 
 function broadcast(room: CollabRoom, excludeId: string, msg: object): void {

@@ -23,7 +23,7 @@ export default function BoardView({ columns, filterByStatus, onSelectTask, onMov
 
   return (
     <div className="board">
-      {columns.map(({ id, status, label, emoji }) => {
+      {columns.map(({ id, label, emoji }) => {
         const columnTasks = filterByStatus(label);
         return (
           <div

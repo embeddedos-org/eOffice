@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { sanitizeHtml } from '@eoffice/core';
 import type { TableDef } from '../hooks/useDatabase';
 
 interface QueryEditorProps {
@@ -83,7 +84,7 @@ export default function QueryEditor({ tables }: QueryEditorProps) {
       <div className="query-input-wrapper">
         <div
           className="query-highlight-layer"
-          dangerouslySetInnerHTML={{ __html: highlighted + '\n' }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(highlighted + '\n') }}
         />
         <textarea
           className="query-textarea"

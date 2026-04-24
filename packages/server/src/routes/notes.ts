@@ -1,14 +1,20 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import type { NoteEntry } from '@eoffice/core';
+import { AuthRequest, pickFields } from '../middleware/auth';
+import { validateStringLength, MAX_TITLE_LENGTH, MAX_CONTENT_LENGTH, MAX_TAG_LENGTH } from '../middleware/validate';
 
-const store = new Map<string, NoteEntry>();
+interface OwnedNote extends NoteEntry {
+  ownerId: string;
+}
+
+const store = new Map<string, OwnedNote>();
 
 export const notesRouter = Router();
 
-// GET /api/notes — list all notes (supports ?search=query and ?tag=tagname)
 notesRouter.get('/', (req: Request, res: Response) => {
-  let notes = Array.from(store.values());
+  const userId = (req as AuthRequest).user?.id;
+  let notes = Array.from(store.values()).filter((n) => n.ownerId === userId);
 
   const search = req.query.search as string | undefined;
   if (search) {
@@ -28,18 +34,20 @@ notesRouter.get('/', (req: Request, res: Response) => {
   res.json({ notes, total: notes.length });
 });
 
-// GET /api/notes/:id — get a note
 notesRouter.get('/:id', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
   const note = store.get(req.params.id);
-  if (!note) {
-    res.status(404).json({ error: `Note not found: ${req.params.id}` });
+  if (!note || note.ownerId !== userId) {
+    res.status(404).json({ error: 'Note not found' });
     return;
   }
   res.json(note);
 });
 
-// POST /api/notes — create a note
 notesRouter.post('/', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
+  if (!userId) { res.status(401).json({ error: 'Authentication required' }); return; }
+
   const { title, content, tags, pinned } = req.body;
 
   if (!title) {
@@ -47,36 +55,46 @@ notesRouter.post('/', (req: Request, res: Response) => {
     return;
   }
 
+  const titleErr = validateStringLength(title, 'title', MAX_TITLE_LENGTH);
+  if (titleErr) { res.status(400).json({ error: titleErr }); return; }
+
+  if (content) {
+    const contentErr = validateStringLength(content, 'content', MAX_CONTENT_LENGTH);
+    if (contentErr) { res.status(400).json({ error: contentErr }); return; }
+  }
+
   const now = new Date();
-  const note: NoteEntry = {
+  const note: OwnedNote = {
     id: crypto.randomUUID(),
     title,
     content: content ?? '',
-    tags: tags ?? [],
+    tags: Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === 'string' && t.length <= MAX_TAG_LENGTH) : [],
     created_at: now,
     updated_at: now,
-    pinned: pinned ?? false,
+    pinned: pinned === true,
+    ownerId: userId,
   };
 
   store.set(note.id, note);
   res.status(201).json(note);
 });
 
-// PUT /api/notes/:id — update a note
 notesRouter.put('/:id', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
   const existing = store.get(req.params.id);
-  if (!existing) {
-    res.status(404).json({ error: `Note not found: ${req.params.id}` });
+  if (!existing || existing.ownerId !== userId) {
+    res.status(404).json({ error: 'Note not found' });
     return;
   }
 
-  const { title, content, tags, pinned } = req.body;
-  const updated: NoteEntry = {
+  const allowed = pickFields<OwnedNote>(req.body, ['title', 'content', 'tags', 'pinned']);
+
+  const updated: OwnedNote = {
     ...existing,
-    title: title ?? existing.title,
-    content: content ?? existing.content,
-    tags: tags ?? existing.tags,
-    pinned: pinned ?? existing.pinned,
+    title: (allowed.title as string) ?? existing.title,
+    content: (allowed.content as string) ?? existing.content,
+    tags: Array.isArray(allowed.tags) ? allowed.tags as string[] : existing.tags,
+    pinned: typeof allowed.pinned === 'boolean' ? allowed.pinned : existing.pinned,
     updated_at: new Date(),
   };
 
@@ -84,10 +102,11 @@ notesRouter.put('/:id', (req: Request, res: Response) => {
   res.json(updated);
 });
 
-// DELETE /api/notes/:id — delete a note
 notesRouter.delete('/:id', (req: Request, res: Response) => {
-  if (!store.has(req.params.id)) {
-    res.status(404).json({ error: `Note not found: ${req.params.id}` });
+  const userId = (req as AuthRequest).user?.id;
+  const note = store.get(req.params.id);
+  if (!note || note.ownerId !== userId) {
+    res.status(404).json({ error: 'Note not found' });
     return;
   }
   store.delete(req.params.id);

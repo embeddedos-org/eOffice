@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, Menu, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -19,6 +19,10 @@ const APP_LIST = [
   { id: 'launcher', name: 'Launcher', icon: '🚀', category: 'System' },
 ];
 
+const VALID_APP_IDS = new Set(APP_LIST.map((a) => a.id));
+const ALLOWED_EXTERNAL_SCHEMES = new Set(['https:', 'mailto:']);
+const SERVER_PORT = process.env.EOFFICE_SERVER_PORT || '3001';
+
 function getAppDistPath(appId) {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, `${appId}-app`);
@@ -38,6 +42,37 @@ function hasReactBuild(appId) {
   return fs.existsSync(path.join(distPath, 'index.html'));
 }
 
+function isValidExternalUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_EXTERNAL_SCHEMES.has(parsed.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function isAllowedNavigation(url) {
+  try {
+    const parsed = new URL(url);
+
+    // Allow file:// only within the app's own directory
+    if (parsed.protocol === 'file:') {
+      const appDir = path.resolve(__dirname, '..');
+      const filePath = path.resolve(decodeURIComponent(parsed.pathname));
+      return filePath.startsWith(appDir);
+    }
+
+    // Allow only localhost on the specific server port
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.hostname === 'localhost' && parsed.port === SERVER_PORT;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -48,8 +83,29 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
   });
+
+  // Set Content Security Policy
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; " +
+          "script-src 'self'; " +
+          "style-src 'self' 'unsafe-inline'; " +
+          "img-src 'self' data: blob:; " +
+          `connect-src 'self' http://localhost:${SERVER_PORT} ws://localhost:${SERVER_PORT}; ` +
+          "font-src 'self'; " +
+          "frame-ancestors 'none'",
+        ],
+      },
+    });
+  });
+
+  const isProduction = app.isPackaged;
 
   const menuTemplate = [
     {
@@ -64,7 +120,7 @@ function createWindow() {
     },
     {
       label: 'Apps',
-      submenu: APP_LIST.filter(a => a.id !== 'launcher').map(appInfo => ({
+      submenu: APP_LIST.filter((a) => a.id !== 'launcher').map((appInfo) => ({
         label: `${appInfo.icon} ${appInfo.name}`,
         click: () => loadApp(appInfo.id),
       })),
@@ -74,7 +130,7 @@ function createWindow() {
       submenu: [
         { role: 'reload' },
         { role: 'forceReload' },
-        { role: 'toggleDevTools' },
+        ...(isProduction ? [] : [{ role: 'toggleDevTools' }]),
         { type: 'separator' },
         { role: 'zoomIn' },
         { role: 'zoomOut' },
@@ -85,35 +141,38 @@ function createWindow() {
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));
 
-  // Default: load the launcher or email
   loadApp('email');
 
-  mainWindow.on('closed', () => { mainWindow = null; });
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 }
 
 function loadApp(appId) {
-  // Try to load the full React app from dist/
+  // Validate appId against whitelist
+  if (!VALID_APP_IDS.has(appId)) {
+    console.error(`Invalid app ID rejected: ${appId}`);
+    return;
+  }
+
   if (hasReactBuild(appId)) {
     const distPath = getAppDistPath(appId);
     mainWindow.loadFile(path.join(distPath, 'index.html'));
   } else if (appId === 'launcher') {
-    // Launcher: try browser fallback
     const browserDir = getBrowserPath();
     mainWindow.loadFile(path.join(browserDir, 'index.html'));
   } else {
-    // Fallback to browser HTML version
     const browserDir = getBrowserPath();
     const htmlFile = path.join(browserDir, `${appId}.html`);
     if (fs.existsSync(htmlFile)) {
       mainWindow.loadFile(htmlFile);
     } else {
-      // Try the React app dist anyway
       const distPath = getAppDistPath(appId);
       mainWindow.loadFile(path.join(distPath, 'index.html'));
     }
   }
 
-  const appInfo = APP_LIST.find(a => a.id === appId);
+  const appInfo = APP_LIST.find((a) => a.id === appId);
   const name = appInfo ? appInfo.name : appId;
   mainWindow.setTitle(`${name} — eOffice Suite`);
 }
@@ -124,26 +183,55 @@ function showAbout() {
     type: 'info',
     title: 'About eOffice Suite',
     message: 'eOffice Suite v1.0.0',
-    detail: 'AI-powered office productivity suite with eBot.\n\n12 apps: eMail, eDocs, eNotes, eSheets, eSlides, eDB, eDrive, eConnect, eForms, eSway, ePlanner + Launcher.\n\n© 2026 EoS Project',
+    detail:
+      'AI-powered office productivity suite with eBot.\n\n12 apps: eMail, eDocs, eNotes, eSheets, eSlides, eDB, eDrive, eConnect, eForms, eSway, ePlanner + Launcher.\n\n© 2026 EoS Project',
   });
 }
 
-// Handle external URLs
+// Restrict navigation to allowed URLs
 app.on('web-contents-created', (_event, contents) => {
   contents.on('will-navigate', (event, url) => {
-    if (url.startsWith('file://')) return;
-    if (url.startsWith('http://localhost')) return;
-    event.preventDefault();
-    shell.openExternal(url);
+    if (!isAllowedNavigation(url)) {
+      event.preventDefault();
+      // If it's a valid external URL, open it externally
+      if (isValidExternalUrl(url)) {
+        shell.openExternal(url);
+      }
+    }
+  });
+
+  // Block new windows from opening — open valid external URLs instead
+  contents.setWindowOpenHandler(({ url }) => {
+    if (isValidExternalUrl(url)) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
   });
 });
 
-// IPC handlers
-ipcMain.handle('open-external', (_event, url) => shell.openExternal(url));
+// IPC handlers with validation
+ipcMain.handle('open-external', (_event, url) => {
+  if (typeof url !== 'string' || !isValidExternalUrl(url)) {
+    throw new Error('Invalid URL: only https: and mailto: schemes are allowed');
+  }
+  return shell.openExternal(url);
+});
+
 ipcMain.handle('get-version', () => app.getVersion());
-ipcMain.handle('open-app', (_event, appId) => loadApp(appId));
+
+ipcMain.handle('open-app', (_event, appId) => {
+  if (typeof appId !== 'string' || !VALID_APP_IDS.has(appId)) {
+    throw new Error('Invalid app ID');
+  }
+  loadApp(appId);
+});
+
 ipcMain.handle('go-home', () => loadApp('launcher'));
 
 app.whenReady().then(createWindow);
-app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+});

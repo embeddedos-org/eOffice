@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 export type TaskStatus = string;
 export type TaskPriority = 'high' | 'medium' | 'low';
@@ -41,9 +41,26 @@ const SAMPLE_TASKS: Task[] = [
   { id: uid(), title: 'Code review tool', description: 'Set up review automation', status: 'In Progress', priority: 'medium', dueDate: '2026-04-20', tags: ['devops'], assignee: 'Eve' },
 ];
 
+const STORAGE_KEY = 'eplanner-data';
+
+function loadFromStorage(): { tasks: Task[]; columns: KanbanColumn[] } | null {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    if (data) return JSON.parse(data);
+  } catch {}
+  return null;
+}
+
+function saveToStorage(tasks: Task[], columns: KanbanColumn[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, columns }));
+  } catch {}
+}
+
 export function usePlanner() {
-  const [tasks, setTasks] = useState<Task[]>(SAMPLE_TASKS);
-  const [columns, setColumns] = useState<KanbanColumn[]>(DEFAULT_COLUMNS);
+  const saved = loadFromStorage();
+  const [tasks, setTasks] = useState<Task[]>(saved?.tasks ?? SAMPLE_TASKS);
+  const [columns, setColumns] = useState<KanbanColumn[]>(saved?.columns ?? DEFAULT_COLUMNS);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) || null;
@@ -94,6 +111,10 @@ export function usePlanner() {
     inProgress: tasks.filter((t) => t.status === 'In Progress').length,
     done: tasks.filter((t) => t.status === 'Done').length,
   };
+
+  useEffect(() => {
+    saveToStorage(tasks, columns);
+  }, [tasks, columns]);
 
   return {
     tasks,

@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'http';
 import crypto from 'crypto';
+import { verifyToken } from '../middleware/auth';
 
 interface SignalUser {
   id: string;
@@ -11,13 +12,33 @@ interface SignalUser {
 
 const signalRooms = new Map<string, Map<string, SignalUser>>();
 
-export function setupSignaling(server: http.Server): void {
-  const wss = new WebSocketServer({ server, path: '/ws/signal' });
+const MAX_ROOMS = 50;
+const MAX_USERS_PER_ROOM = 20;
+const MAX_MESSAGE_SIZE = 64 * 1024; // 64KB
 
-  wss.on('connection', (ws: WebSocket) => {
+export function setupSignaling(server: http.Server): WebSocketServer {
+  const wss = new WebSocketServer({ server, path: '/ws/signal', maxPayload: MAX_MESSAGE_SIZE });
+
+  wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
+    // Authenticate via query param token
+    const url = new URL(req.url || '', `http://${req.headers.host}`);
+    const token = url.searchParams.get('token');
+    const payload = token ? verifyToken(token) : null;
+
+    if (!payload) {
+      ws.close(4001, 'Authentication required');
+      return;
+    }
+
+    const authName = (payload.username as string) || 'Anonymous';
     let user: SignalUser | null = null;
 
     ws.on('message', (data: Buffer) => {
+      if (data.length > MAX_MESSAGE_SIZE) {
+        ws.close(4002, 'Message too large');
+        return;
+      }
+
       try {
         const msg = JSON.parse(data.toString());
 
@@ -25,15 +46,26 @@ export function setupSignaling(server: http.Server): void {
           case 'join-call': {
             const userId = crypto.randomUUID().slice(0, 8);
             const roomId = msg.roomId || 'default';
-            user = { id: userId, name: msg.name || `User ${userId}`, ws, roomId };
+
+            if (signalRooms.size >= MAX_ROOMS && !signalRooms.has(roomId)) {
+              ws.send(JSON.stringify({ type: 'error', message: 'Maximum room limit reached' }));
+              return;
+            }
+
+            user = { id: userId, name: msg.name || authName, ws, roomId };
 
             if (!signalRooms.has(roomId)) {
               signalRooms.set(roomId, new Map());
             }
             const room = signalRooms.get(roomId)!;
+
+            if (room.size >= MAX_USERS_PER_ROOM) {
+              ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));
+              return;
+            }
+
             room.set(userId, user);
 
-            // Tell the new user about existing participants
             const existingUsers = Array.from(room.values())
               .filter((u) => u.id !== userId)
               .map((u) => ({ id: u.id, name: u.name }));
@@ -44,7 +76,6 @@ export function setupSignaling(server: http.Server): void {
               participants: existingUsers,
             }));
 
-            // Tell existing users about the new participant
             broadcastSignal(room, userId, {
               type: 'peer-joined',
               peerId: userId,
@@ -117,8 +148,8 @@ export function setupSignaling(server: http.Server): void {
     }
   });
 
-  // eslint-disable-next-line no-console
   console.log('  WebRTC signaling server ready at /ws/signal');
+  return wss;
 }
 
 function broadcastSignal(room: Map<string, SignalUser>, excludeId: string, msg: object): void {

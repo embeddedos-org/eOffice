@@ -235,6 +235,11 @@ export function useVideoCall(serverUrl: string = 'ws://localhost:3001') {
     return () => { cleanup(); wsRef.current?.close(); };
   }, []);
 
+  const startCall = useCallback(async (userName: string = 'User') => {
+    const roomId = `room-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    await joinCall(roomId, userName);
+  }, [joinCall]);
+
   return {
     inCall,
     participants,
@@ -243,6 +248,7 @@ export function useVideoCall(serverUrl: string = 'ws://localhost:3001') {
     muted,
     cameraOff,
     screenSharing,
+    startCall,
     joinCall,
     leaveCall,
     toggleMute,

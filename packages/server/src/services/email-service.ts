@@ -162,6 +162,11 @@ export class EmailService {
     await this.imapClient.mailboxDelete(name);
   }
 
+  async renameFolder(oldName: string, newName: string): Promise<void> {
+    if (!this.imapClient) throw new Error('Not connected');
+    await this.imapClient.mailboxRename(oldName, newName);
+  }
+
   async getMessages(folder: string = 'INBOX', page: number = 1, pageSize: number = 50): Promise<{ messages: EmailMessage[]; total: number }> {
     if (!this.imapClient) throw new Error('Not connected');
 

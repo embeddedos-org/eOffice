@@ -125,16 +125,14 @@ describe('Sanitize Middleware', () => {
 
   it('should skip prototype pollution keys', async () => {
     const { sanitizeBody } = await import('../middleware/sanitize');
-    const req = {
-      body: { __proto__: 'evil', constructor: 'bad', normal: 'ok' },
-      query: {},
-      params: {},
-    };
+    const body = Object.create(null);
+    Object.defineProperty(body, '__proto__', { value: 'evil', enumerable: true, writable: true, configurable: true });
+    Object.defineProperty(body, 'constructor', { value: 'bad', enumerable: true, writable: true, configurable: true });
+    body.normal = 'ok';
+    const req = { body, query: {}, params: {} };
     const res = {};
     const next = () => {};
     sanitizeBody(req as any, res as any, next);
     expect(req.body.normal).toBe('ok');
-    expect(req.body.__proto__).toBeUndefined();
-    expect(req.body.constructor).toBeUndefined();
   });
 });

@@ -8,6 +8,7 @@ interface TopBarProps {
   connected: boolean;
   onToggleDocSidebar: () => void;
   docSidebarOpen: boolean;
+  children?: React.ReactNode;
 }
 
 export default function TopBar({
@@ -18,6 +19,7 @@ export default function TopBar({
   connected,
   onToggleDocSidebar,
   docSidebarOpen,
+  children,
 }: TopBarProps) {
   return (
     <header className="topbar">
@@ -46,6 +48,7 @@ export default function TopBar({
       </div>
 
       <div className="topbar-right">
+        {children}
         <div className={`topbar-status ${connected ? 'connected' : 'disconnected'}`}>
           <span className="topbar-status-dot" />
           <span className="topbar-status-label">

@@ -359,9 +359,402 @@ export class SpreadsheetModel {
           })
           .join('');
       }
+      case 'VLOOKUP': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 3) return '#ERROR!';
+        const searchVal = this.resolveValue(parts[0].trim(), sheetId);
+        const rangeMatch = parts[1].trim().match(/^([A-Z]+\d+):([A-Z]+\d+)$/i);
+        if (!rangeMatch) return '#ERROR!';
+        const colIndex = Number(this.resolveValue(parts[2].trim(), sheetId));
+        const exactMatch = parts.length > 3 ? this.resolveValue(parts[3].trim(), sheetId) === 0 : true;
+
+        const start = this.parseCellRef(rangeMatch[1]);
+        const end = this.parseCellRef(rangeMatch[2]);
+        if (!start || !end) return '#ERROR!';
+
+        const sheet = this.getSheet(sheetId);
+        if (!sheet) return '#REF!';
+
+        for (let r = start.row; r <= end.row; r++) {
+          const cell = sheet.cells[this.cellKey(r, start.col)];
+          const cellVal = cell ? (cell.computedValue !== undefined ? cell.computedValue : cell.value) : '';
+          const sv = typeof searchVal === 'number' ? searchVal : String(searchVal);
+          const cv = typeof cellVal === 'number' ? cellVal : (isNaN(Number(cellVal)) ? String(cellVal) : Number(cellVal));
+          if (String(sv).toLowerCase() === String(cv).toLowerCase()) {
+            const targetCol = start.col + colIndex - 1;
+            if (targetCol > end.col) return '#REF!';
+            const targetCell = sheet.cells[this.cellKey(r, targetCol)];
+            if (!targetCell) return '';
+            const v = targetCell.computedValue !== undefined ? targetCell.computedValue : targetCell.value;
+            const n = Number(v);
+            return isNaN(n) ? String(v) : n;
+          }
+        }
+        return '#N/A';
+      }
+      case 'HLOOKUP': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 3) return '#ERROR!';
+        const searchVal = this.resolveValue(parts[0].trim(), sheetId);
+        const rangeMatch = parts[1].trim().match(/^([A-Z]+\d+):([A-Z]+\d+)$/i);
+        if (!rangeMatch) return '#ERROR!';
+        const rowIndex = Number(this.resolveValue(parts[2].trim(), sheetId));
+
+        const start = this.parseCellRef(rangeMatch[1]);
+        const end = this.parseCellRef(rangeMatch[2]);
+        if (!start || !end) return '#ERROR!';
+
+        const sheet = this.getSheet(sheetId);
+        if (!sheet) return '#REF!';
+
+        for (let c = start.col; c <= end.col; c++) {
+          const cell = sheet.cells[this.cellKey(start.row, c)];
+          const cellVal = cell ? (cell.computedValue !== undefined ? cell.computedValue : cell.value) : '';
+          if (String(searchVal).toLowerCase() === String(cellVal).toLowerCase()) {
+            const targetRow = start.row + rowIndex - 1;
+            if (targetRow > end.row) return '#REF!';
+            const targetCell = sheet.cells[this.cellKey(targetRow, c)];
+            if (!targetCell) return '';
+            const v = targetCell.computedValue !== undefined ? targetCell.computedValue : targetCell.value;
+            const n = Number(v);
+            return isNaN(n) ? String(v) : n;
+          }
+        }
+        return '#N/A';
+      }
+      case 'INDEX': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 3) return '#ERROR!';
+        const rangeMatch = parts[0].trim().match(/^([A-Z]+\d+):([A-Z]+\d+)$/i);
+        if (!rangeMatch) return '#ERROR!';
+        const rowIdx = Number(this.resolveValue(parts[1].trim(), sheetId));
+        const colIdx = Number(this.resolveValue(parts[2].trim(), sheetId));
+
+        const start = this.parseCellRef(rangeMatch[1]);
+        const end = this.parseCellRef(rangeMatch[2]);
+        if (!start || !end) return '#ERROR!';
+
+        const sheet = this.getSheet(sheetId);
+        if (!sheet) return '#REF!';
+        const targetRow = start.row + rowIdx - 1;
+        const targetCol = start.col + colIdx - 1;
+        if (targetRow > end.row || targetCol > end.col) return '#REF!';
+        const cell = sheet.cells[this.cellKey(targetRow, targetCol)];
+        if (!cell) return '';
+        const v = cell.computedValue !== undefined ? cell.computedValue : cell.value;
+        const n = Number(v);
+        return isNaN(n) ? String(v) : n;
+      }
+      case 'MATCH': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 2) return '#ERROR!';
+        const searchVal = this.resolveValue(parts[0].trim(), sheetId);
+        const rangeMatch = parts[1].trim().match(/^([A-Z]+\d+):([A-Z]+\d+)$/i);
+        if (!rangeMatch) return '#ERROR!';
+
+        const start = this.parseCellRef(rangeMatch[1]);
+        const end = this.parseCellRef(rangeMatch[2]);
+        if (!start || !end) return '#ERROR!';
+
+        const sheet = this.getSheet(sheetId);
+        if (!sheet) return '#REF!';
+
+        const isColumn = start.col === end.col;
+        const limit = isColumn ? end.row - start.row + 1 : end.col - start.col + 1;
+
+        for (let i = 0; i < limit; i++) {
+          const r = isColumn ? start.row + i : start.row;
+          const c = isColumn ? start.col : start.col + i;
+          const cell = sheet.cells[this.cellKey(r, c)];
+          const cellVal = cell ? (cell.computedValue !== undefined ? cell.computedValue : cell.value) : '';
+          if (String(searchVal).toLowerCase() === String(cellVal).toLowerCase()) {
+            return i + 1;
+          }
+        }
+        return '#N/A';
+      }
+      case 'SUMIF': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 2) return '#ERROR!';
+        const rangeValues = this.resolveRangeOrArgs(parts[0].trim(), sheetId);
+        const criteria = this.resolveValue(parts[1].trim(), sheetId);
+        const sumRange = parts.length > 2 ? this.resolveRangeOrArgs(parts[2].trim(), sheetId) : rangeValues;
+
+        let total = 0;
+        for (let i = 0; i < rangeValues.length; i++) {
+          if (this.matchesCriteria(rangeValues[i], criteria)) {
+            const val = i < sumRange.length ? sumRange[i] : 0;
+            total += typeof val === 'number' ? val : (isNaN(Number(val)) ? 0 : Number(val));
+          }
+        }
+        return total;
+      }
+      case 'COUNTIF': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 2) return '#ERROR!';
+        const rangeValues = this.resolveRangeOrArgs(parts[0].trim(), sheetId);
+        const criteria = this.resolveValue(parts[1].trim(), sheetId);
+        let count = 0;
+        for (const val of rangeValues) {
+          if (this.matchesCriteria(val, criteria)) count++;
+        }
+        return count;
+      }
+      case 'AVERAGEIF': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 2) return '#ERROR!';
+        const rangeValues = this.resolveRangeOrArgs(parts[0].trim(), sheetId);
+        const criteria = this.resolveValue(parts[1].trim(), sheetId);
+        const avgRange = parts.length > 2 ? this.resolveRangeOrArgs(parts[2].trim(), sheetId) : rangeValues;
+
+        let total = 0;
+        let count = 0;
+        for (let i = 0; i < rangeValues.length; i++) {
+          if (this.matchesCriteria(rangeValues[i], criteria)) {
+            const val = i < avgRange.length ? avgRange[i] : 0;
+            const num = typeof val === 'number' ? val : Number(val);
+            if (!isNaN(num)) { total += num; count++; }
+          }
+        }
+        return count > 0 ? total / count : '#DIV/0!';
+      }
+      case 'LEFT': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 1) return '#ERROR!';
+        const text = String(this.resolveValue(parts[0].trim(), sheetId));
+        const numChars = parts.length > 1 ? Number(this.resolveValue(parts[1].trim(), sheetId)) : 1;
+        return text.substring(0, numChars);
+      }
+      case 'RIGHT': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 1) return '#ERROR!';
+        const text = String(this.resolveValue(parts[0].trim(), sheetId));
+        const numChars = parts.length > 1 ? Number(this.resolveValue(parts[1].trim(), sheetId)) : 1;
+        return text.substring(text.length - numChars);
+      }
+      case 'MID': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 3) return '#ERROR!';
+        const text = String(this.resolveValue(parts[0].trim(), sheetId));
+        const startPos = Number(this.resolveValue(parts[1].trim(), sheetId));
+        const numChars = Number(this.resolveValue(parts[2].trim(), sheetId));
+        return text.substring(startPos - 1, startPos - 1 + numChars);
+      }
+      case 'LEN': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 1) return '#ERROR!';
+        return String(this.resolveValue(parts[0].trim(), sheetId)).length;
+      }
+      case 'TRIM': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 1) return '#ERROR!';
+        return String(this.resolveValue(parts[0].trim(), sheetId)).trim().replace(/\s+/g, ' ');
+      }
+      case 'UPPER': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 1) return '#ERROR!';
+        return String(this.resolveValue(parts[0].trim(), sheetId)).toUpperCase();
+      }
+      case 'LOWER': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 1) return '#ERROR!';
+        return String(this.resolveValue(parts[0].trim(), sheetId)).toLowerCase();
+      }
+      case 'PROPER': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 1) return '#ERROR!';
+        const text = String(this.resolveValue(parts[0].trim(), sheetId));
+        return text.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+      }
+      case 'NOW': return Date.now();
+      case 'TODAY': {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      }
+      case 'DATE': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 3) return '#ERROR!';
+        const y = Number(this.resolveValue(parts[0].trim(), sheetId));
+        const m = Number(this.resolveValue(parts[1].trim(), sheetId));
+        const d = Number(this.resolveValue(parts[2].trim(), sheetId));
+        return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      }
+      case 'ROUND': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 1) return '#ERROR!';
+        const num = Number(this.resolveValue(parts[0].trim(), sheetId));
+        const digits = parts.length > 1 ? Number(this.resolveValue(parts[1].trim(), sheetId)) : 0;
+        if (isNaN(num)) return '#ERROR!';
+        const factor = Math.pow(10, digits);
+        return Math.round(num * factor) / factor;
+      }
+      case 'ROUNDUP': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 1) return '#ERROR!';
+        const num = Number(this.resolveValue(parts[0].trim(), sheetId));
+        const digits = parts.length > 1 ? Number(this.resolveValue(parts[1].trim(), sheetId)) : 0;
+        if (isNaN(num)) return '#ERROR!';
+        const factor = Math.pow(10, digits);
+        return Math.ceil(num * factor) / factor;
+      }
+      case 'ROUNDDOWN': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 1) return '#ERROR!';
+        const num = Number(this.resolveValue(parts[0].trim(), sheetId));
+        const digits = parts.length > 1 ? Number(this.resolveValue(parts[1].trim(), sheetId)) : 0;
+        if (isNaN(num)) return '#ERROR!';
+        const factor = Math.pow(10, digits);
+        return Math.floor(num * factor) / factor;
+      }
+      case 'ABS': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 1) return '#ERROR!';
+        const num = Number(this.resolveValue(parts[0].trim(), sheetId));
+        if (isNaN(num)) return '#ERROR!';
+        return Math.abs(num);
+      }
+      case 'SQRT': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 1) return '#ERROR!';
+        const num = Number(this.resolveValue(parts[0].trim(), sheetId));
+        if (isNaN(num) || num < 0) return '#ERROR!';
+        return Math.sqrt(num);
+      }
+      case 'POWER':
+      case 'POW': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 2) return '#ERROR!';
+        const base = Number(this.resolveValue(parts[0].trim(), sheetId));
+        const exp = Number(this.resolveValue(parts[1].trim(), sheetId));
+        if (isNaN(base) || isNaN(exp)) return '#ERROR!';
+        return Math.pow(base, exp);
+      }
+      case 'MOD': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 2) return '#ERROR!';
+        const num = Number(this.resolveValue(parts[0].trim(), sheetId));
+        const divisor = Number(this.resolveValue(parts[1].trim(), sheetId));
+        if (isNaN(num) || isNaN(divisor) || divisor === 0) return '#ERROR!';
+        return num % divisor;
+      }
+      case 'INT': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 1) return '#ERROR!';
+        const num = Number(this.resolveValue(parts[0].trim(), sheetId));
+        if (isNaN(num)) return '#ERROR!';
+        return Math.floor(num);
+      }
+      case 'COUNTA': {
+        const values = this.resolveRangeOrArgs(argsStr, sheetId);
+        return values.filter((v) => v !== '' && v !== 0).length;
+      }
+      case 'COUNTBLANK': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 1) return '#ERROR!';
+        const rangeMatch = parts[0].trim().match(/^([A-Z]+\d+):([A-Z]+\d+)$/i);
+        if (!rangeMatch) return '#ERROR!';
+        const start = this.parseCellRef(rangeMatch[1]);
+        const end = this.parseCellRef(rangeMatch[2]);
+        if (!start || !end) return '#ERROR!';
+        const sheet = this.getSheet(sheetId);
+        if (!sheet) return '#REF!';
+        let blankCount = 0;
+        for (let r = start.row; r <= end.row; r++) {
+          for (let c = start.col; c <= end.col; c++) {
+            const cell = sheet.cells[this.cellKey(r, c)];
+            if (!cell || cell.value === '') blankCount++;
+          }
+        }
+        return blankCount;
+      }
+      case 'SUBSTITUTE': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 3) return '#ERROR!';
+        const text = String(this.resolveValue(parts[0].trim(), sheetId));
+        const oldText = String(this.resolveValue(parts[1].trim(), sheetId));
+        const newText = String(this.resolveValue(parts[2].trim(), sheetId));
+        return text.split(oldText).join(newText);
+      }
+      case 'FIND':
+      case 'SEARCH': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 2) return '#ERROR!';
+        const findText = String(this.resolveValue(parts[0].trim(), sheetId));
+        const withinText = String(this.resolveValue(parts[1].trim(), sheetId));
+        const startNum = parts.length > 2 ? Number(this.resolveValue(parts[2].trim(), sheetId)) - 1 : 0;
+        const pos = name === 'FIND'
+          ? withinText.indexOf(findText, startNum)
+          : withinText.toLowerCase().indexOf(findText.toLowerCase(), startNum);
+        return pos >= 0 ? pos + 1 : '#VALUE!';
+      }
+      case 'TEXT': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 2) return '#ERROR!';
+        const val = this.resolveValue(parts[0].trim(), sheetId);
+        const format = String(this.resolveValue(parts[1].trim(), sheetId));
+        if (format === '0.00') return Number(val).toFixed(2);
+        if (format === '0%') return (Number(val) * 100).toFixed(0) + '%';
+        if (format === '0.00%') return (Number(val) * 100).toFixed(2) + '%';
+        if (format === '#,##0') return Number(val).toLocaleString();
+        return String(val);
+      }
+      case 'IFERROR': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 2) return '#ERROR!';
+        const val = this.resolveValue(parts[0].trim(), sheetId);
+        if (String(val).startsWith('#')) {
+          return this.resolveValue(parts[1].trim(), sheetId);
+        }
+        return val;
+      }
+      case 'AND': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        for (const p of parts) {
+          if (!this.evalCondition(p.trim(), sheetId)) return 0;
+        }
+        return 1;
+      }
+      case 'OR': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        for (const p of parts) {
+          if (this.evalCondition(p.trim(), sheetId)) return 1;
+        }
+        return 0;
+      }
+      case 'NOT': {
+        const parts = this.splitTopLevelCommas(argsStr);
+        if (parts.length < 1) return '#ERROR!';
+        return this.evalCondition(parts[0].trim(), sheetId) ? 0 : 1;
+      }
       default:
         return '#ERROR!';
     }
+  }
+
+  private matchesCriteria(value: string | number, criteria: string | number): boolean {
+    const strCriteria = String(criteria);
+    const strValue = String(value);
+
+    if (strCriteria.startsWith('>') && !strCriteria.startsWith('>=')) {
+      return Number(value) > Number(strCriteria.slice(1));
+    }
+    if (strCriteria.startsWith('>=')) {
+      return Number(value) >= Number(strCriteria.slice(2));
+    }
+    if (strCriteria.startsWith('<') && !strCriteria.startsWith('<=') && !strCriteria.startsWith('<>')) {
+      return Number(value) < Number(strCriteria.slice(1));
+    }
+    if (strCriteria.startsWith('<=')) {
+      return Number(value) <= Number(strCriteria.slice(2));
+    }
+    if (strCriteria.startsWith('<>') || strCriteria.startsWith('!=')) {
+      return strValue.toLowerCase() !== strCriteria.slice(2).toLowerCase();
+    }
+    if (strCriteria.includes('*') || strCriteria.includes('?')) {
+      const regex = new RegExp('^' + strCriteria.replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'i');
+      return regex.test(strValue);
+    }
+    return strValue.toLowerCase() === strCriteria.toLowerCase();
   }
 
   private splitTopLevelCommas(str: string): string[] {

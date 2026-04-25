@@ -10,6 +10,7 @@ function mockReq(overrides: Record<string, unknown> = {}) {
     params: {},
     query: {},
     body: {},
+    user: { id: 'test-user-1', username: 'testuser', email: 'test@test.com', role: 'user' },
     ...overrides,
   } as unknown as express.Request;
 }

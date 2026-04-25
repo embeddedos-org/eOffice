@@ -1,4 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { WS_URL } from '../../../shared/config';
+import { getUser } from '../../../shared/config';
 
 export interface Channel { id: string; name: string; members: number; description?: string; }
 export interface Message {
@@ -10,109 +12,316 @@ export interface Message {
   type?: 'text' | 'file';
   fileName?: string;
   fileSize?: number;
+  replyTo?: string;
+  reactions?: Record<string, string[]>;
 }
 
 export interface UserPresence {
+  id?: string;
   name: string;
   online: boolean;
+  status?: 'online' | 'away' | 'busy' | 'dnd';
   lastSeen?: string;
 }
 
 let nextId = 1;
-const uid = () => `${nextId++}`;
+const uid = () => `msg-${Date.now()}-${nextId++}`;
 
 const SEED_CHANNELS: Channel[] = [
-  { id: uid(), name: 'general', members: 12, description: 'General discussion' },
-  { id: uid(), name: 'engineering', members: 8, description: 'Engineering team' },
-  { id: uid(), name: 'design', members: 5, description: 'Design team' },
-  { id: uid(), name: 'random', members: 15, description: 'Off-topic' },
-];
-
-const SEED_MESSAGES: Message[] = [
-  { id: uid(), channelId: '1', author: 'Alice', content: 'Welcome to the general channel! 🎉', timestamp: '9:00 AM' },
-  { id: uid(), channelId: '1', author: 'Bob', content: 'Hey everyone! Excited to be here.', timestamp: '9:05 AM' },
-  { id: uid(), channelId: '1', author: 'Carol', content: 'Don\'t forget the standup at 10 AM.', timestamp: '9:15 AM' },
-  { id: uid(), channelId: '2', author: 'Dave', content: 'PR #42 is ready for review.', timestamp: '10:30 AM' },
-  { id: uid(), channelId: '2', author: 'Alice', content: 'I\'ll take a look after lunch.', timestamp: '10:45 AM' },
-  { id: uid(), channelId: '3', author: 'Eve', content: 'New mockups are in Figma — feedback welcome!', timestamp: '11:00 AM' },
-];
-
-const USERS: UserPresence[] = [
-  { name: 'Alice', online: true },
-  { name: 'Bob', online: true },
-  { name: 'Carol', online: false, lastSeen: '2 hours ago' },
-  { name: 'Dave', online: true },
-  { name: 'Eve', online: false, lastSeen: '30 min ago' },
+  { id: 'general', name: 'general', members: 0, description: 'General discussion' },
+  { id: 'engineering', name: 'engineering', members: 0, description: 'Engineering team' },
+  { id: 'design', name: 'design', members: 0, description: 'Design team' },
+  { id: 'random', name: 'random', members: 0, description: 'Off-topic' },
 ];
 
 export function useConnect() {
   const [channels, setChannels] = useState<Channel[]>(SEED_CHANNELS);
-  const [messages, setMessages] = useState<Message[]>(SEED_MESSAGES);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [selectedChannelId, setSelectedChannelId] = useState<string>(SEED_CHANNELS[0].id);
   const [typingUser, setTypingUser] = useState<string | null>(null);
-  const [users] = useState<UserPresence[]>(USERS);
+  const [users, setUsers] = useState<UserPresence[]>([]);
+  const [connected, setConnected] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selectedChannel = channels.find((c) => c.id === selectedChannelId) ?? null;
   const channelMessages = messages.filter((m) => m.channelId === selectedChannelId);
 
-  const addChannel = useCallback((name: string, description = '') => {
-    const id = uid();
-    setChannels((prev) => [...prev, { id, name, members: 1, description }]);
-    setSelectedChannelId(id);
+  // Connect to WebSocket
+  const connectWs = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+
+    const user = getUser();
+    const ws = new WebSocket(`${WS_URL}/ws/chat`);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      setConnected(true);
+      ws.send(JSON.stringify({
+        type: 'join',
+        userId: user?.id || `anon-${Date.now()}`,
+        userName: user?.username || 'Anonymous',
+        channelId: selectedChannelId,
+      }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+
+        switch (msg.type) {
+          case 'joined': {
+            if (msg.history) {
+              const historyMessages: Message[] = msg.history.map((h: any) => ({
+                id: h.id,
+                channelId: msg.channelId || selectedChannelId,
+                author: h.userName,
+                content: h.content,
+                timestamp: new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                type: 'text',
+                replyTo: h.replyTo,
+                reactions: h.reactions || {},
+              }));
+              setMessages(prev => [...prev.filter(m => m.channelId !== (msg.channelId || selectedChannelId)), ...historyMessages]);
+            }
+            if (msg.users) {
+              setUsers(msg.users.map((u: any) => ({
+                id: u.id,
+                name: u.name,
+                online: true,
+                status: u.status || 'online',
+              })));
+            }
+            break;
+          }
+
+          case 'message': {
+            const newMsg: Message = {
+              id: msg.messageId,
+              channelId: msg.channelId || selectedChannelId,
+              author: msg.userName,
+              content: msg.content,
+              timestamp: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              type: 'text',
+              replyTo: msg.replyTo,
+            };
+            setMessages(prev => [...prev, newMsg]);
+            setTypingUser(null);
+            break;
+          }
+
+          case 'user-joined': {
+            if (msg.users) {
+              setUsers(msg.users.map((u: any) => ({
+                id: u.id,
+                name: u.name,
+                online: true,
+                status: u.status || 'online',
+              })));
+            }
+            // Update channel member count
+            setChannels(prev => prev.map(c =>
+              c.id === selectedChannelId ? { ...c, members: msg.users?.length || c.members } : c
+            ));
+            break;
+          }
+
+          case 'user-left': {
+            if (msg.users) {
+              setUsers(msg.users.map((u: any) => ({
+                id: u.id,
+                name: u.name,
+                online: true,
+                status: u.status || 'online',
+              })));
+            }
+            break;
+          }
+
+          case 'typing': {
+            setTypingUser(msg.userName);
+            if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+            typingTimerRef.current = setTimeout(() => setTypingUser(null), 3000);
+            break;
+          }
+
+          case 'stop-typing': {
+            setTypingUser(null);
+            break;
+          }
+
+          case 'reaction-update': {
+            setMessages(prev => prev.map(m =>
+              m.id === msg.targetMessageId ? { ...m, reactions: msg.reactions } : m
+            ));
+            break;
+          }
+
+          case 'channel-switched': {
+            if (msg.history) {
+              const historyMessages: Message[] = msg.history.map((h: any) => ({
+                id: h.id,
+                channelId: msg.channelId,
+                author: h.userName,
+                content: h.content,
+                timestamp: new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                type: 'text',
+                reactions: h.reactions || {},
+              }));
+              setMessages(prev => [...prev.filter(m => m.channelId !== msg.channelId), ...historyMessages]);
+            }
+            if (msg.users) {
+              setUsers(msg.users.map((u: any) => ({
+                id: u.id,
+                name: u.name,
+                online: true,
+                status: u.status || 'online',
+              })));
+            }
+            break;
+          }
+
+          case 'direct-message':
+          case 'dm-sent': {
+            const dmMsg: Message = {
+              id: msg.messageId,
+              channelId: `dm-${msg.userId}`,
+              author: msg.userName,
+              content: msg.content,
+              timestamp: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              type: 'text',
+            };
+            setMessages(prev => [...prev, dmMsg]);
+            break;
+          }
+
+          case 'status-change': {
+            if (msg.users) {
+              setUsers(msg.users.map((u: any) => ({
+                id: u.id,
+                name: u.name,
+                online: true,
+                status: u.status || 'online',
+              })));
+            }
+            break;
+          }
+        }
+      } catch (err) {
+        console.error('Chat message parse error:', err);
+      }
+    };
+
+    ws.onclose = () => {
+      setConnected(false);
+      // Auto-reconnect after 3 seconds
+      reconnectTimerRef.current = setTimeout(() => connectWs(), 3000);
+    };
+
+    ws.onerror = () => {
+      setConnected(false);
+    };
+  }, [selectedChannelId]);
+
+  // Connect on mount
+  useEffect(() => {
+    connectWs();
+    return () => {
+      wsRef.current?.close();
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    };
   }, []);
 
-  const sendMessage = useCallback((content: string) => {
-    const id = uid();
-    const now = new Date();
-    const timestamp = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setMessages((prev) => [...prev, { id, channelId: selectedChannelId, author: 'You', content, timestamp, type: 'text' }]);
+  const addChannel = useCallback((name: string, description = '') => {
+    const id = name.toLowerCase().replace(/\s+/g, '-');
+    setChannels((prev) => [...prev, { id, name, members: 1, description }]);
+    setSelectedChannelId(id);
 
-    // Simulate someone typing after a delay
-    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-    typingTimerRef.current = setTimeout(() => {
-      const randomUser = ['Alice', 'Bob', 'Dave'][Math.floor(Math.random() * 3)];
-      setTypingUser(randomUser);
-      setTimeout(() => {
-        setTypingUser(null);
-        const replyId = uid();
-        const replyTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        setMessages((prev) => [...prev, {
-          id: replyId, channelId: selectedChannelId, author: randomUser,
-          content: getRandomReply(), timestamp: replyTime, type: 'text',
-        }]);
-      }, 2000 + Math.random() * 2000);
-    }, 1500);
+    // Switch to new channel via WebSocket
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'switch-channel', channelId: id }));
+    }
+  }, []);
+
+  const switchChannel = useCallback((channelId: string) => {
+    setSelectedChannelId(channelId);
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'switch-channel', channelId }));
+    }
+  }, []);
+
+  const sendMessage = useCallback((content: string, replyTo?: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'message',
+        content,
+        replyTo,
+      }));
+    } else {
+      // Offline fallback — store locally
+      const id = uid();
+      const now = new Date();
+      const timestamp = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const user = getUser();
+      setMessages((prev) => [...prev, {
+        id, channelId: selectedChannelId,
+        author: user?.username || 'You',
+        content, timestamp, type: 'text',
+        replyTo,
+      }]);
+    }
   }, [selectedChannelId]);
 
   const sendFileMessage = useCallback((fileName: string, fileSize: number) => {
-    const id = uid();
-    const now = new Date();
-    const timestamp = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setMessages((prev) => [...prev, {
-      id, channelId: selectedChannelId, author: 'You',
-      content: `📎 Shared file: ${fileName}`, timestamp,
-      type: 'file', fileName, fileSize,
-    }]);
-  }, [selectedChannelId]);
+    const content = `📎 Shared file: ${fileName} (${formatSize(fileSize)})`;
+    sendMessage(content);
+  }, [sendMessage]);
 
-  // Cleanup timer
-  useEffect(() => {
-    return () => { if (typingTimerRef.current) clearTimeout(typingTimerRef.current); };
+  const sendTyping = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'typing' }));
+    }
+  }, []);
+
+  const addReaction = useCallback((messageId: string, emoji: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'reaction',
+        targetMessageId: messageId,
+        reaction: emoji,
+      }));
+    }
+  }, []);
+
+  const setUserStatus = useCallback((status: 'online' | 'away' | 'busy' | 'dnd') => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'status', content: status }));
+    }
+  }, []);
+
+  const sendDirectMessage = useCallback((userId: string, content: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'direct-message',
+        userId,
+        content,
+      }));
+    }
   }, []);
 
   return {
     channels, messages, selectedChannelId, selectedChannel, channelMessages,
-    typingUser, users,
-    setSelectedChannelId, addChannel, sendMessage, sendFileMessage,
+    typingUser, users, connected,
+    setSelectedChannelId: switchChannel,
+    addChannel, sendMessage, sendFileMessage,
+    sendTyping, addReaction, setUserStatus, sendDirectMessage,
   };
 }
 
-function getRandomReply(): string {
-  const replies = [
-    'Sounds great! 👍', 'I agree!', 'Let me check on that.',
-    'Thanks for sharing!', 'Good point.', 'Will do! ✅',
-    'Can you elaborate?', 'Nice work! 🎉', 'I\'ll follow up on that.',
-  ];
-  return replies[Math.floor(Math.random() * replies.length)];
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

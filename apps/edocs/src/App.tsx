@@ -6,7 +6,9 @@ import EBotSidebar from './components/EBotSidebar';
 import StatusBar from './components/StatusBar';
 import DocumentSidebar, { DocMeta, TEMPLATES } from './components/DocumentSidebar';
 import { useEBot } from './hooks/useEBot';
-import { API_URL } from '../../shared/config';
+import { useCollab } from './hooks/useCollab';
+import { API_URL, apiClient, getUser } from '../../shared/config';
+import { LoginScreen } from '../../shared/LoginScreen';
 import { exportToDocx, exportToPdf, exportToHtml, exportToMarkdown } from '@eoffice/core/src/file-export';
 
 interface FormatState {
@@ -28,7 +30,7 @@ function loadDocuments(): DocMeta[] {
   }
 }
 
-function saveDocuments(docs: DocMeta[]) {
+function saveDocumentsLocal(docs: DocMeta[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(docs));
 }
 
@@ -36,7 +38,7 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-export default function App() {
+function EdocsApp() {
   const [documents, setDocuments] = useState<DocMeta[]>(() => loadDocuments());
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
   const [content, setContent] = useState('');
@@ -60,13 +62,71 @@ export default function App() {
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const isRemoteUpdate = useRef(false);
 
   const { connected: ebotConnected, loading: isLoading, summarize, rewrite, grammarCheck, translate } = useEBot();
 
+  const user = getUser();
+  const collab = useCollab({
+    docId: activeDocId || 'default',
+    userName: user?.username || 'Anonymous',
+  });
+
+  // Load documents from server on mount, fall back to localStorage
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchDocs() {
+      try {
+        const serverDocs = await apiClient<DocMeta[]>('/api/documents');
+        if (!cancelled && serverDocs.length > 0) {
+          setDocuments(serverDocs);
+          saveDocumentsLocal(serverDocs);
+        }
+      } catch {
+        // Server unavailable — localStorage data already loaded
+      }
+    }
+    fetchDocs();
+    return () => { cancelled = true; };
+  }, []);
+
   // Persist documents to localStorage whenever they change
   useEffect(() => {
-    saveDocuments(documents);
+    saveDocumentsLocal(documents);
   }, [documents]);
+
+  // Save documents to server whenever they change
+  useEffect(() => {
+    async function syncToServer() {
+      try {
+        await apiClient('/api/documents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(documents),
+        });
+      } catch {
+        // Server unavailable — localStorage is the fallback
+      }
+    }
+    if (documents.length > 0) {
+      syncToServer();
+    }
+  }, [documents]);
+
+  // Wire remote edits from collaborators
+  useEffect(() => {
+    if (!collab.connected) return;
+    const unsubscribe = collab.onRemoteEdit((remoteHtml: string) => {
+      if (editorRef.current) {
+        isRemoteUpdate.current = true;
+        editorRef.current.innerHTML = remoteHtml;
+        setContent(editorRef.current.innerText || '');
+        computeStats(editorRef.current.innerText || '');
+        isRemoteUpdate.current = false;
+      }
+    });
+    return unsubscribe;
+  }, [collab.connected, collab.onRemoteEdit]);
 
   const computeStats = useCallback((text: string) => {
     const trimmed = text.trim();
@@ -91,6 +151,11 @@ export default function App() {
       computeStats(newContent);
       setAutoSaveStatus('unsaved');
 
+      // Send edit to collaborators (skip if this was a remote update)
+      if (!isRemoteUpdate.current && collab.connected) {
+        collab.sendEdit(editorRef.current?.innerHTML || '');
+      }
+
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
       autoSaveTimer.current = setTimeout(() => {
         setAutoSaveStatus('saving');
@@ -98,7 +163,7 @@ export default function App() {
         setTimeout(() => setAutoSaveStatus('saved'), 600);
       }, 1500);
     },
-    [computeStats, persistActiveDoc]
+    [computeStats, persistActiveDoc, collab.connected, collab.sendEdit]
   );
 
   const handleFormat = useCallback((command: string) => {
@@ -212,6 +277,15 @@ export default function App() {
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Collaborate button handler
+  const handleCollaborate = useCallback(() => {
+    if (collab.connected) {
+      collab.disconnect();
+    } else {
+      collab.connect(editorRef.current?.innerHTML || '');
+    }
+  }, [collab.connected, collab.connect, collab.disconnect]);
 
   // Document management
   const handleNewDocument = useCallback(
@@ -348,7 +422,49 @@ export default function App() {
         connected={ebotConnected}
         onToggleDocSidebar={() => setDocSidebarOpen((prev) => !prev)}
         docSidebarOpen={docSidebarOpen}
-      />
+      >
+        {/* Collaborate button and connected users */}
+        <button
+          className={`collab-btn ${collab.connected ? 'active' : ''}`}
+          onClick={handleCollaborate}
+          title={collab.connected ? 'Disconnect collaboration' : 'Start collaboration'}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '4px 12px',
+            borderRadius: '6px',
+            border: collab.connected ? '1px solid #34d399' : '1px solid #555',
+            background: collab.connected ? 'rgba(52,211,153,0.15)' : 'transparent',
+            color: collab.connected ? '#34d399' : '#aaa',
+            cursor: 'pointer',
+            fontSize: '13px',
+          }}
+        >
+          {collab.connected ? 'Live' : 'Collaborate'}
+        </button>
+        {collab.connected && collab.users.length > 0 && (
+          <div
+            className="collab-users"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '8px' }}
+          >
+            {collab.users.map((u) => (
+              <span
+                key={u.id}
+                title={u.name}
+                style={{
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  backgroundColor: u.color,
+                  display: 'inline-block',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </TopBar>
       <Toolbar
         formatState={formatState}
         onFormat={handleFormat}
@@ -403,5 +519,13 @@ export default function App() {
         onChange={handleImageSelected}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <LoginScreen appName="eDocs" appIcon="📝">
+      <EdocsApp />
+    </LoginScreen>
   );
 }

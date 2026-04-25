@@ -23,6 +23,7 @@ import { securityHeaders } from './middleware/security-headers';
 import { globalLimiter, ebotLimiter } from './middleware/rate-limit';
 import { setupCollaboration } from './services/collaboration';
 import { setupSignaling } from './services/signaling';
+import { setupChat } from './services/chat';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -80,12 +81,14 @@ const server = http.createServer(app);
 // WebSocket services
 const collabWss = setupCollaboration(server);
 const signalWss = setupSignaling(server);
+const chatWss = setupChat(server);
 
 server.listen(PORT, () => {
   console.log(`eOffice Server v0.2.0 listening on port ${PORT}`);
   console.log(`  REST API:    http://localhost:${PORT}/api`);
   console.log(`  WebSocket:   ws://localhost:${PORT}/ws/collab (collaboration)`);
   console.log(`  WebSocket:   ws://localhost:${PORT}/ws/signal (video calling)`);
+  console.log(`  WebSocket:   ws://localhost:${PORT}/ws/chat (real-time messaging)`);
 });
 
 // Graceful shutdown
@@ -108,6 +111,13 @@ function gracefulShutdown(signal: string) {
       client.close(1001, 'Server shutting down');
     });
     signalWss.close();
+  }
+
+  if (chatWss) {
+    chatWss.clients.forEach((client) => {
+      client.close(1001, 'Server shutting down');
+    });
+    chatWss.close();
   }
 
   // Force exit after 10 seconds

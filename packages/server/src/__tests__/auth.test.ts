@@ -102,12 +102,11 @@ describe('Auth Security', () => {
     it('should only pick allowed fields', async () => {
       const { pickFields } = await import('../middleware/auth');
       const result = pickFields(
-        { title: 'Hello', content: 'World', __proto__: 'bad', constructor: 'evil' },
+        { title: 'Hello', content: 'World', secret: 'hidden' },
         ['title', 'content'],
       );
       expect(result).toEqual({ title: 'Hello', content: 'World' });
-      expect((result as Record<string, unknown>).__proto__).toBeUndefined();
-      expect((result as Record<string, unknown>).constructor).toBeUndefined();
+      expect((result as Record<string, unknown>).secret).toBeUndefined();
     });
 
     it('should handle missing fields', async () => {

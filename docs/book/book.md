@@ -19,6 +19,9 @@ titlepage-background: "cover.png"
 
 ## Product Reference
 
+![Figure: eOffice System Architecture — collaborative editing with CRDT and AI assistance](images/architecture.png)
+
+
 **Authors:** Srikanth Patchava & EmbeddedOS Contributors
 
 **Edition:** First Edition — April 2026

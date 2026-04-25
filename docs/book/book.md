@@ -1710,6 +1710,9 @@ and other content types with live cursor tracking and conflict resolution.
 
 ### Message Types
 
+![Figure: eOffice Real-Time Collaboration — CRDT operations, WebSocket broadcast, conflict resolution](images/collab-sync.png)
+
+
 ```typescript
 type CollabMessage =
   | { type: 'join'; documentId: string; userId: string }
@@ -2169,6 +2172,9 @@ Response: 200 OK
 ## 10.2 Documents API (eDocs)
 
 ### List Documents
+
+![Figure: eOffice Document Processing Pipeline — parse, build DOM, layout, render, export](images/doc-pipeline.png)
+
 
 ```http
 GET /api/documents

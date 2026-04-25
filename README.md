@@ -22,6 +22,8 @@
 
 ## 📦 What is eOffice?
 
+[![Book](https://github.com/embeddedos-org/eOffice/actions/workflows/book-build.yml/badge.svg)](https://github.com/embeddedos-org/eOffice/actions/workflows/book-build.yml)
+
 eOffice is a complete open-source office productivity suite — like Microsoft 365 — with built-in **AI/LLM intelligence** powered by **eBot**. It runs on Windows, macOS, Linux, browsers, Chrome Extension, and as a PWA.
 
 ### 12 Applications

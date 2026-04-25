@@ -279,3 +279,15 @@ All routes (except auth and health) require `Authorization: Bearer <token>` head
 MIT License — see [LICENSE](LICENSE) for details.
 
 © 2026 EmbeddedOS Project
+
+
+---
+Part of the [EmbeddedOS Organization](https://embeddedos-org.github.io).
+
+## Security
+
+Please see [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
+
+## Contributing
+
+Please see [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.

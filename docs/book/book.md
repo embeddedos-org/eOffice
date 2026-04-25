@@ -39,6 +39,9 @@ titlepage-background: "cover.png"
 
 ## Table of Contents
 
+
+![Figure: eOffice — 3D Product Visualization](images/product-3d.png)
+
 - [Preface](#preface)
 - [Chapter 1 — Introduction to eOffice](#chapter-1--introduction-to-eoffice)
 - [Chapter 2 — Architecture Overview](#chapter-2--architecture-overview)

@@ -1,3 +1,14 @@
+---
+title: "eOffice — Official Reference Guide"
+author: "Srikanth Patchava & EmbeddedOS Contributors"
+date: "April 2026"
+version: "v1.0.0"
+bibliography: references.bib
+csl: ieee.csl
+titlepage: true
+titlepage-background: "cover.png"
+---
+
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 <!--  eOffice Suite — AI-Powered Office Productivity: Product Reference -->
 <!-- ═══════════════════════════════════════════════════════════════════ -->
@@ -29,7 +40,7 @@
 - [Chapter 1 — Introduction to eOffice](#chapter-1--introduction-to-eoffice)
 - [Chapter 2 — Architecture Overview](#chapter-2--architecture-overview)
 - [Chapter 3 — The 12 Applications](#chapter-3--the-12-applications)
-- [Chapter 4 — eBot AI Integration](#chapter-4--ebot-ai-integration)
+- [Chapter 4 — eBot [@ellis1989] AI Integration](#chapter-4--ebot-ai-integration)
 - [Chapter 5 — Security Architecture](#chapter-5--security-architecture)
 - [Chapter 6 — Data Persistence Layer](#chapter-6--data-persistence-layer)
 - [Chapter 7 — Real-Time Collaboration](#chapter-7--real-time-collaboration)
@@ -327,7 +338,7 @@ It supports document creation, formatting, templates, and export.
 
 - Rich text editing with toolbar (bold, italic, underline, headings, lists)
 - Document templates (letter, report, resume, memo)
-- Export to PDF, DOCX, and plain text
+- Export to PDF [@iso32000], DOCX, and plain text
 - Version history with diff view
 - Real-time collaborative editing via WebSocket
 - Find and replace with regex support
@@ -1726,7 +1737,7 @@ interface CursorPosition {
 }
 ```
 
-## 7.4 CRDT Concepts
+## 7.4 CRDT [@shapiro2011] Concepts
 
 While the current implementation uses operational transformation (OT) for
 conflict resolution, the architecture is designed to support CRDT
@@ -3436,3 +3447,8 @@ npm ls
 *Copyright 2026 Srikanth Patchava and EmbeddedOS Contributors. MIT License.*
 
 *Generated April 2026.*
+
+## References
+
+::: {#refs}
+:::

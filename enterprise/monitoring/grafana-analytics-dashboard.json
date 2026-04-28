@@ -1,0 +1,66 @@
+{
+  "title": "eOffice Analytics Dashboard",
+  "uid": "eoffice-analytics",
+  "tags": [
+    "eoffice",
+    "analytics"
+  ],
+  "panels": [
+    {
+      "title": "Daily Active Users (7d)",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "description": "curl /api/analytics/dashboard | jq '.dailyTrend'"
+    },
+    {
+      "title": "Feature Usage Ranking",
+      "type": "barchart",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "description": "curl /api/analytics/dashboard | jq '.featureRanking'"
+    },
+    {
+      "title": "App Usage",
+      "type": "piechart",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 8
+      },
+      "description": "curl /api/analytics/dashboard | jq '.appRanking'"
+    },
+    {
+      "title": "Error & Crash Rate",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 8
+      },
+      "description": "curl /api/analytics/dashboard | jq '.dailyTrend[] | {date, errors}'"
+    },
+    {
+      "title": "Recent Crashes",
+      "type": "table",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 8
+      },
+      "description": "curl /api/analytics/crashes?limit=20"
+    }
+  ],
+  "schemaVersion": 39
+}

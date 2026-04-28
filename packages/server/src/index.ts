@@ -30,6 +30,8 @@ import { generateMetrics } from './services/metrics';
 import { requestLogger } from './middleware/request-logger';
 import { startAutoBackup, stopAutoBackup } from './services/backup';
 import { backupRouter } from './routes/backup';
+import { analyticsRouter } from './routes/analytics';
+import { analyticsTracker } from './middleware/analytics-tracker';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);

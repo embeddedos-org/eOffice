@@ -21,22 +21,46 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
+
+      - name: Install project dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build core package
+        run: pnpm --filter @eoffice/core build
+
+      - name: Build all 12 frontend apps
+        run: |
+          for app in edocs esheets eslides email econnect eplanner enotes edb edrive eforms esway launcher; do
+            echo "Building $app..."
+            cd apps/$app && pnpm build && cd ../..
+          done
+        shell: bash
+
       - name: Install desktop dependencies
         run: cd desktop && npm install
-      - name: Build
+
+      - name: Build desktop app
         run: cd desktop && npx electron-builder ${{ matrix.target }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
+
       - uses: actions/upload-artifact@v4
         with:
-          name: eoffice-${{ matrix.artifact }}
+          name: eoffice-desktop-${{ matrix.artifact }}
           path: |
             desktop/dist/*.exe
             desktop/dist/*.dmg
             desktop/dist/*.zip
             desktop/dist/*.AppImage
             desktop/dist/*.deb
+            desktop/dist/*.nsis.7z

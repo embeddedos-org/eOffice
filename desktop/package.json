@@ -1,7 +1,7 @@
 {
   "name": "eoffice-desktop",
-  "version": "1.0.0",
-  "description": "eOffice Suite — Desktop App for Windows, macOS, Linux",
+  "version": "2.0.0",
+  "description": "eOffice Suite \u2014 Desktop App for Windows, macOS, Linux",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -15,7 +15,7 @@
     "appId": "org.embeddedos.eoffice",
     "forceCodeSigning": false,
     "productName": "eOffice Suite",
-    "copyright": "Copyright © 2026 EoS Project",
+    "copyright": "Copyright \u00a9 2026 EoS Project",
     "files": [
       "main.js",
       "preload.js",
@@ -25,67 +25,93 @@
       {
         "from": "../browser",
         "to": "browser",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../apps/email/dist",
         "to": "email-app",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../apps/edocs/dist",
         "to": "edocs-app",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../apps/enotes/dist",
         "to": "enotes-app",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../apps/esheets/dist",
         "to": "esheets-app",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../apps/eslides/dist",
         "to": "eslides-app",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../apps/edb/dist",
         "to": "edb-app",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../apps/edrive/dist",
         "to": "edrive-app",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../apps/econnect/dist",
         "to": "econnect-app",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../apps/eforms/dist",
         "to": "eforms-app",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../apps/esway/dist",
         "to": "esway-app",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../apps/eplanner/dist",
         "to": "eplanner-app",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../apps/launcher/dist",
         "to": "launcher-app",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "directories": {
@@ -109,8 +135,7 @@
     "linux": {
       "target": [
         "AppImage",
-        "deb",
-        "rpm"
+        "deb"
       ],
       "icon": "assets/icon.png",
       "category": "Office"

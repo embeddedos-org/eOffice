@@ -1,0 +1,45 @@
+// PM2 Canary Deployment — runs stable (port 3001) + canary (port 3002)
+module.exports = {
+  apps: [
+    {
+      name: 'eoffice-stable',
+      script: 'packages/server/src/index.ts',
+      interpreter: 'node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      max_memory_restart: '512M',
+      cwd: '/home/spatchava/embeddedos-org/eOffice',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3001,
+        PATH: '/home/spatchava/.nvm/versions/node/v20.20.2/bin:/usr/bin:/bin',
+        EOFFICE_INSTANCE: 'stable',
+      },
+      kill_timeout: 10000,
+      max_restarts: 10,
+      restart_delay: 1000,
+      min_uptime: 5000,
+    },
+    {
+      name: 'eoffice-canary',
+      script: 'packages/server/src/index.ts',
+      interpreter: 'node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      max_memory_restart: '512M',
+      cwd: '/home/spatchava/embeddedos-org/eOffice',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3002,
+        PATH: '/home/spatchava/.nvm/versions/node/v20.20.2/bin:/usr/bin:/bin',
+        EOFFICE_INSTANCE: 'canary',
+      },
+      kill_timeout: 10000,
+      max_restarts: 10,
+      restart_delay: 1000,
+      min_uptime: 5000,
+    },
+  ],
+};

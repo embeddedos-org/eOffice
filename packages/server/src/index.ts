@@ -56,6 +56,14 @@ app.use(
   }),
 );
 app.use(express.json({ limit: '10mb' }));
+
+// Canary instance identifier
+const INSTANCE_ID = process.env.EOFFICE_INSTANCE || 'default';
+app.use((_req, res, next) => {
+  res.setHeader('X-Instance', INSTANCE_ID);
+  if (INSTANCE_ID === 'canary') res.setHeader('X-Canary', 'true');
+  next();
+});
 app.use(globalLimiter);
 app.use(auditLog);
 app.use(sanitizeBody);

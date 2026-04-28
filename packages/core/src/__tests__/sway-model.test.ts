@@ -9,15 +9,15 @@ describe('SwayModel', () => {
 
   it('should create a presentation', () => {
     const model = new SwayModel();
-    const pres = model.createPresentation('Interactive Demo');
+    const pres = model.addPresentation('Interactive Demo');
     expect(pres.title).toBe('Interactive Demo');
   });
 
   it('should add a slide', () => {
     const model = new SwayModel();
-    const pres = model.createPresentation('Demo');
-    model.addSlide(pres.id, { type: 'content', content: 'Hello' });
-    const updated = model.getPresentation(pres.id);
+    const pres = model.addPresentation('Demo');
+    model.addSlide(pres.id, 'quiz', 'What is 2+2?', ['3', '4', '5']);
+    const updated = model.presentations.find((p) => p.id === pres.id);
     expect(updated?.slides.length).toBeGreaterThan(0);
   });
 });

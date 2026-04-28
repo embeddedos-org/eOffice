@@ -1,13 +1,148 @@
 {
-  "name": "Office Suite — EoS",
-  "short_name": "eoffice",
-  "description": "Office Suite - EoS Progressive Web App",
-  "start_url": ".",
+  "name": "eOffice \u2014 AI-Powered Office Suite",
+  "short_name": "eOffice",
+  "description": "Complete AI-powered office suite with documents, spreadsheets, presentations, email, and more",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#1976D2",
+  "theme_color": "#667eea",
+  "orientation": "any",
+  "categories": [
+    "productivity",
+    "business",
+    "utilities"
+  ],
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "eDocs",
+      "short_name": "Docs",
+      "url": "/?app=edocs",
+      "icons": [
+        {
+          "src": "/icons/edocs.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "eSheets",
+      "short_name": "Sheets",
+      "url": "/?app=esheets",
+      "icons": [
+        {
+          "src": "/icons/esheets.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "eSlides",
+      "short_name": "Slides",
+      "url": "/?app=eslides",
+      "icons": [
+        {
+          "src": "/icons/eslides.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "eMail",
+      "short_name": "Mail",
+      "url": "/?app=email",
+      "icons": [
+        {
+          "src": "/icons/email.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "eConnect",
+      "short_name": "Connect",
+      "url": "/?app=econnect",
+      "icons": [
+        {
+          "src": "/icons/econnect.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "share_target": {
+    "action": "/?share=true",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "files",
+          "accept": [
+            "*/*"
+          ]
+        }
+      ]
+    }
+  },
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/screenshots/mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
   ]
 }

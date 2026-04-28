@@ -22,12 +22,13 @@ import type { EmailRule } from './components/RulesEditor';
 import { useMailbox } from './hooks/useMailbox';
 import { useEBot } from './hooks/useEBot';
 import { API_URL } from '../../shared/config';
+import { LoginScreen } from '../../shared/LoginScreen';
 
 const SERVER_URL = API_URL;
 
 type SidePanel = 'none' | 'contacts' | 'search';
 
-export default function App() {
+function EmailApp() {
   const [ebotOpen, setEbotOpen] = useState(false);
   const [ebotResponse, setEbotResponse] = useState('');
   const [composerOpen, setComposerOpen] = useState(false);
@@ -476,5 +477,14 @@ export default function App() {
         accountEmail={mailbox.account?.email}
       />
     </div>
+  );
+}
+
+
+export default function App() {
+  return (
+    <LoginScreen appName="eMail" appIcon="📧">
+      <EmailApp />
+    </LoginScreen>
   );
 }

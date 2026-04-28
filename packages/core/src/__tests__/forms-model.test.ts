@@ -9,28 +9,26 @@ describe('FormsModel', () => {
 
   it('should create a form', () => {
     const model = new FormsModel();
-    const form = model.createForm('Survey', [
-      { id: '1', type: 'text', label: 'Name', required: true },
-    ]);
+    const form = model.addForm('Survey', 'A test survey');
+    model.addField(form.id, { type: 'text', label: 'Name', required: true });
     expect(form.title).toBe('Survey');
-    expect(form.fields.length).toBe(1);
+    const updated = model.forms.find((f) => f.id === form.id);
+    expect(updated!.fields.length).toBe(1);
   });
 
   it('should submit a response', () => {
     const model = new FormsModel();
-    const form = model.createForm('Survey', [
-      { id: '1', type: 'text', label: 'Name', required: true },
-    ]);
-    model.submitResponse(form.id, { '1': 'Alice' });
-    const responses = model.getResponses(form.id);
+    const form = model.addForm('Survey', 'A test survey');
+    model.addField(form.id, { type: 'text', label: 'Name', required: true });
+    model.submitForm(form.id, { Name: 'Alice' });
+    const responses = model.getSubmissions(form.id);
     expect(responses.length).toBe(1);
   });
 
   it('should list forms', () => {
     const model = new FormsModel();
-    model.createForm('Form 1', []);
-    model.createForm('Form 2', []);
-    const forms = model.getForms();
-    expect(forms.length).toBeGreaterThanOrEqual(2);
+    model.addForm('Form 1', 'First form');
+    model.addForm('Form 2', 'Second form');
+    expect(model.forms.length).toBeGreaterThanOrEqual(2);
   });
 });

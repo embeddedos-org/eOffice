@@ -9,8 +9,9 @@ import PresenterView from './components/PresenterView';
 import { usePresentation } from './hooks/usePresentation';
 import { useEBot } from './hooks/useEBot';
 import { exportToPptx } from '@eoffice/core';
+import { LoginScreen } from '../../shared/LoginScreen';
 
-export default function App() {
+function EslidesApp() {
   const [title, setTitle] = useState('Untitled Presentation');
   const [ebotOpen, setEbotOpen] = useState(false);
   const [ebotResponse, setEbotResponse] = useState('');
@@ -154,5 +155,14 @@ export default function App() {
         connected={connected}
       />
     </div>
+  );
+}
+
+
+export default function App() {
+  return (
+    <LoginScreen appName="eSlides" appIcon="📽️">
+      <EslidesApp />
+    </LoginScreen>
   );
 }

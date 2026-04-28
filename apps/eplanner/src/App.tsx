@@ -10,8 +10,9 @@ import StatusBar from './components/StatusBar';
 import InputDialog from '../../shared/InputDialog';
 import { usePlanner } from './hooks/usePlanner';
 import { useEBot } from './hooks/useEBot';
+import { LoginScreen } from '../../shared/LoginScreen';
 
-export default function App() {
+function EplannerApp() {
   const [boardName, setBoardName] = useState('My Project Board');
   const [currentView, setCurrentView] = useState<PlannerView>('board');
   const [ebotOpen, setEbotOpen] = useState(false);
@@ -150,5 +151,14 @@ export default function App() {
         connected={connected}
       />
     </div>
+  );
+}
+
+
+export default function App() {
+  return (
+    <LoginScreen appName="ePlanner" appIcon="📅">
+      <EplannerApp />
+    </LoginScreen>
   );
 }

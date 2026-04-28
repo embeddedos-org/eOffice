@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { aiService } from '../services/ai-service';
+import { ragService } from '../services/rag';
 import { AuthRequest } from '../middleware/auth';
 
-const EAI_BASE_URL = process.env.EAI_BASE_URL || 'http://localhost:8420';
 
 export const ebotRouter = Router();
 
@@ -160,15 +160,19 @@ ebotRouter.post('/task-extract', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/ebot/search — Semantic search across documents
+// POST /api/ebot/search — Semantic search across documents (RAG)
 ebotRouter.post('/search', async (req: Request, res: Response) => {
   try {
-    const { query } = req.body;
+    const { query, appType, limit } = req.body;
     if (!query) { res.status(400).json({ error: 'query is required' }); return; }
-    // TODO: Wire to RAG service when implemented
+    const results = ragService.search(query, limit || 10, appType);
+    const stats = ragService.getStats();
     res.json({
-      results: [],
-      response: `Search for "${query}" — RAG indexing not yet configured. Set up document indexing to enable semantic search.`,
+      results,
+      stats,
+      response: results.length > 0
+        ? `Found ${results.length} results for "${query}"`
+        : `No results found for "${query}". ${stats.documentCount} documents indexed.`,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -176,38 +180,44 @@ ebotRouter.post('/search', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/ebot/index — Index a document for RAG search
+ebotRouter.post('/index', async (req: Request, res: Response) => {
+  try {
+    const { docId, appType, title, content } = req.body;
+    if (!docId || !appType || !title) {
+      res.status(400).json({ error: 'docId, appType, and title are required' });
+      return;
+    }
+    ragService.indexDocument(docId, appType, title, content || '');
+    res.json({ status: 'indexed', docId });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Indexing failed', details: message });
+  }
+});
+
 // GET /api/ebot/status — AI service status
 ebotRouter.get('/status', async (_req: Request, res: Response) => {
-  const hasOpenAI = !!process.env.OPENAI_API_KEY;
-  let localAvailable = false;
-
-  try {
-    const response = await fetch(`${EAI_BASE_URL}/v1/status`);
-    localAvailable = response.ok;
-  } catch {
-    localAvailable = false;
-  }
-
+  const providers = aiService.getProviderStatus();
   res.json({
     status: 'ok',
-    capabilities: {
-      openai: hasOpenAI,
-      localLLM: localAvailable,
-      ruleBased: true,
-    },
-    activeProvider: hasOpenAI ? 'openai' : localAvailable ? 'local' : 'rule-based',
+    providers,
+    activeProvider: aiService.getActiveProvider(),
     features: [
       'chat', 'summarize', 'rewrite', 'grammar', 'translate',
-      'formula', 'slides', 'analyze', 'task-extract', 'complete',
+      'formula', 'slides', 'analyze', 'task-extract', 'complete', 'search',
     ],
+    rag: ragService.getStats(),
   });
 });
 
 // GET /api/ebot/models — Available models
 ebotRouter.get('/models', (_req: Request, res: Response) => {
-  const models = ['rule-based'];
-  if (process.env.OPENAI_API_KEY) models.push('gpt-4o-mini', 'gpt-4o');
-  res.json({ models });
+  const providers = aiService.getProviderStatus();
+  const models = providers
+    .filter(p => p.available)
+    .map(p => p.name);
+  res.json({ models, activeProvider: aiService.getActiveProvider() });
 });
 
 // POST /api/ebot/reset — Reset conversation context

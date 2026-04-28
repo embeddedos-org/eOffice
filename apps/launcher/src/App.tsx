@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { useState } from 'react';
 import { APP_REGISTRY, VERSION } from '@eoffice/core';
 import type { AppCategory, EOfficeApp } from '@eoffice/core';
+import { LoginScreen } from '../../shared/LoginScreen';
 
 const PORT_MAP: Record<string, number> = {
   edocs: 5173,
@@ -32,7 +33,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   collaboration: '#a855f7',
 };
 
-export default function App() {
+function LauncherApp() {
   const [filter, setFilter] = useState<'all' | AppCategory>('all');
   const filtered = filter === 'all'
     ? APP_REGISTRY
@@ -111,5 +112,14 @@ export default function App() {
         <span>eBot AI-Powered</span>
       </footer>
     </div>
+  );
+}
+
+
+export default function App() {
+  return (
+    <LoginScreen appName="eOffice Launcher" appIcon="🚀">
+      <LauncherApp />
+    </LoginScreen>
   );
 }

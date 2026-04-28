@@ -8,8 +8,9 @@ import StatusBar from './components/StatusBar';
 import InputDialog from '../../shared/InputDialog';
 import { useDrive } from './hooks/useDrive';
 import { useEBot } from './hooks/useEBot';
+import { LoginScreen } from '../../shared/LoginScreen';
 
-export default function App() {
+function EdriveApp() {
   const [ebotOpen, setEbotOpen] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -84,5 +85,14 @@ export default function App() {
         connected={ebot.connected}
       />
     </div>
+  );
+}
+
+
+export default function App() {
+  return (
+    <LoginScreen appName="eDrive" appIcon="📁">
+      <EdriveApp />
+    </LoginScreen>
   );
 }

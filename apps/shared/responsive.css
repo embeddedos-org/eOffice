@@ -1,0 +1,127 @@
+/* eOffice Shared Mobile Responsive Styles */
+
+/* Base responsive variables */
+:root {
+  --sidebar-width: 280px;
+  --topbar-height: 48px;
+  --statusbar-height: 24px;
+  --toolbar-height: 40px;
+  --touch-target-min: 44px;
+}
+
+/* Mobile breakpoint */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 100%;
+    --topbar-height: 44px;
+  }
+
+  /* Hide sidebars by default on mobile */
+  .sidebar, [class*="sidebar"], [class*="Sidebar"] {
+    position: fixed !important;
+    left: -100% !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 85vw !important;
+    max-width: 320px !important;
+    z-index: 1000 !important;
+    transition: left 0.3s ease !important;
+    box-shadow: 4px 0 16px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .sidebar.open, [class*="sidebar"].open, [class*="Sidebar"].open {
+    left: 0 !important;
+  }
+
+  /* Stack toolbar items */
+  .toolbar {
+    flex-wrap: wrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Make buttons touch-friendly */
+  button, [role="button"], input[type="submit"] {
+    min-height: var(--touch-target-min);
+    min-width: var(--touch-target-min);
+  }
+
+  /* Full-width inputs */
+  input[type="text"], input[type="email"], input[type="password"],
+  textarea, select {
+    font-size: 16px !important; /* Prevent iOS zoom */
+  }
+
+  /* Responsive grid */
+  .grid, [class*="grid"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Bottom navigation for mobile */
+  .mobile-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-around;
+    background: #fff;
+    border-top: 1px solid #e0e0e0;
+    padding: 4px 0 env(safe-area-inset-bottom, 4px);
+    z-index: 900;
+  }
+
+  .mobile-nav button {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 0;
+    background: none;
+    border: none;
+    font-size: 10px;
+    color: #666;
+    cursor: pointer;
+  }
+
+  .mobile-nav button.active {
+    color: #667eea;
+  }
+
+  .mobile-nav button span.icon {
+    font-size: 20px;
+    margin-bottom: 2px;
+  }
+
+  /* Hide status bar on mobile */
+  .statusbar, [class*="statusbar"], [class*="StatusBar"] {
+    display: none !important;
+  }
+
+  /* Adjust main content for bottom nav */
+  .main-content {
+    padding-bottom: 60px !important;
+  }
+}
+
+/* Tablet breakpoint */
+@media (min-width: 769px) and (max-width: 1024px) {
+  :root {
+    --sidebar-width: 220px;
+  }
+}
+
+/* Print styles */
+@media print {
+  .toolbar, .sidebar, .topbar, .statusbar, .mobile-nav,
+  [class*="Toolbar"], [class*="Sidebar"], [class*="TopBar"], [class*="StatusBar"] {
+    display: none !important;
+  }
+
+  .editor, .main-content, [class*="Editor"], [class*="content"] {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+}

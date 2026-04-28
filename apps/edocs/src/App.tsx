@@ -99,11 +99,25 @@ function EdocsApp() {
   useEffect(() => {
     async function syncToServer() {
       try {
-        await apiClient('/api/documents', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(documents),
-        });
+        for (const doc of documents) {
+          await apiClient(`/api/documents/${doc.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              title: doc.title,
+              content: doc.content || '',
+            }),
+          }).catch(() => {
+            // Document may not exist on server yet — create it
+            apiClient('/api/documents', {
+              method: 'POST',
+              body: JSON.stringify({
+                title: doc.title,
+                content: doc.content || '',
+                app_id: 'edocs',
+              }),
+            }).catch(() => {});
+          });
+        }
       } catch {
         // Server unavailable — localStorage is the fallback
       }

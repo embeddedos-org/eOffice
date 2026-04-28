@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_URL } from '../../../shared/config';
-
-const API_BASE = API_URL + '/api/ebot';
+import { apiClient } from '../../../shared/config';
 
 export interface GrammarResult {
   suggestions: string[];
@@ -13,24 +11,18 @@ export function useEBot() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_BASE}/status`)
-      .then((r) => (r.ok ? setConnected(true) : setConnected(false)))
+    apiClient('/api/ebot/status')
+      .then(() => setConnected(true))
       .catch(() => setConnected(false));
   }, []);
 
   const callEBot = useCallback(async (endpoint: string, body?: object): Promise<string> => {
     setLoading(true);
     try {
-      const resp = await fetch(`${API_BASE}/${endpoint}`, {
+      const data = await apiClient<any>(`/api/ebot/${endpoint}`, {
         method: body ? 'POST' : 'GET',
-        headers: { 'Content-Type': 'application/json' },
         body: body ? JSON.stringify(body) : undefined,
       });
-      if (!resp.ok) {
-        const errText = await resp.text().catch(() => resp.statusText);
-        throw new Error(`eBot error (${resp.status}): ${errText}`);
-      }
-      const data = await resp.json();
       setConnected(true);
       return data.text || data.response || JSON.stringify(data);
     } catch (err) {

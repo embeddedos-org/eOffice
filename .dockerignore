@@ -1,0 +1,15 @@
+node_modules
+.git
+.gitignore
+desktop/
+*.md
+!README.md
+.env
+.env.*
+*.log
+coverage/
+e2e/
+.vscode/
+.idea/
+*.swp
+*.swo

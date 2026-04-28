@@ -8,6 +8,7 @@ import EBotSidebar from './components/EBotSidebar';
 import StatusBar from './components/StatusBar';
 import { useSway } from './hooks/useSway';
 import { useEBot } from './hooks/useEBot';
+import { LoginScreen } from '../../shared/LoginScreen';
 
 function PresenterMode({ slides, onExit }: { slides: ReturnType<typeof useSway>['slides']; onExit: () => void }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -88,7 +89,7 @@ function PresenterMode({ slides, onExit }: { slides: ReturnType<typeof useSway>[
   );
 }
 
-export default function App() {
+function EswayApp() {
   const [ebotOpen, setEbotOpen] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [presenting, setPresenting] = useState(false);
@@ -167,5 +168,14 @@ export default function App() {
         connected={ebot.connected}
       />
     </div>
+  );
+}
+
+
+export default function App() {
+  return (
+    <LoginScreen appName="eSway" appIcon="🎯">
+      <EswayApp />
+    </LoginScreen>
   );
 }

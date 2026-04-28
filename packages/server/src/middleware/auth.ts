@@ -4,9 +4,14 @@ import os from 'os';
 import path from 'path';
 import { FileStore } from '../storage/store';
 
-const JWT_SECRET = process.env.JWT_SECRET || (() => {
+const JWT_SECRET = (() => {
+  const envSecret = process.env.JWT_SECRET;
+  if (envSecret) return envSecret;
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL: JWT_SECRET environment variable is required in production mode. Set it to a secure random string (min 64 characters).');
+  }
   const secret = crypto.randomBytes(64).toString('hex');
-  console.warn('CRITICAL: No JWT_SECRET env var set. Using random secret — tokens will not survive restarts.');
+  console.warn('WARNING: No JWT_SECRET env var set. Using random secret — tokens will not survive restarts. Set JWT_SECRET for production use.');
   return secret;
 })();
 

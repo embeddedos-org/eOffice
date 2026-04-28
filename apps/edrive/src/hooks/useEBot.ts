@@ -1,28 +1,23 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_URL } from '../../../shared/config';
-
-const API_BASE = API_URL + '/api/ebot';
+import { apiClient } from '../../../shared/config';
 
 export function useEBot() {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_BASE}/status`)
-      .then((r) => (r.ok ? setConnected(true) : setConnected(false)))
+    apiClient('/api/ebot/status')
+      .then(() => setConnected(true))
       .catch(() => setConnected(false));
   }, []);
 
   const callEBot = useCallback(async (message: string): Promise<string> => {
     setLoading(true);
     try {
-      const resp = await fetch(`${API_BASE}/chat`, {
+      const data = await apiClient<any>('/api/ebot/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message }),
       });
-      if (!resp.ok) throw new Error(`eBot error (${resp.status})`);
-      const data = await resp.json();
       setConnected(true);
       return data.text || data.response || JSON.stringify(data);
     } catch (err) {

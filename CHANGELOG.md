@@ -1,5 +1,65 @@
 # Changelog
 
+## [2.0.0] - 2026-04-27
+
+### Security & Bug Fixes
+- **CRITICAL**: Fixed eBot auth bypass — all 12 apps now use `apiClient` with JWT tokens instead of raw `fetch`
+- **CRITICAL**: Enforced `JWT_SECRET` as required in production mode (throws on startup if missing)
+- Fixed eDocs server sync bug — documents are now synced individually via PUT instead of sending entire array
+- Added `LoginScreen` authentication wrapper to all 12 apps (was only on eDocs)
+- Made CORS origins fully configurable via `CORS_ORIGINS` environment variable
+
+### Storage
+- Added SQLite storage backend via `better-sqlite3` (default, replaces JSON files)
+- Auto-migration from existing JSON file storage to SQLite on first run
+- Added `STORAGE_BACKEND` env var toggle (`sqlite` or `file`)
+- Added full-text search support via SQLite
+
+### AI
+- Multi-provider AI with fallback chain: OpenAI → Anthropic → Ollama → EAI → Rule-based
+- Added Anthropic Claude provider (direct HTTP, no SDK dependency)
+- Added Ollama provider for local LLM support
+- Added retry logic with exponential backoff for transient AI errors
+- Wired RAG search service to `/api/ebot/search` route (was a stub)
+- Added `/api/ebot/index` endpoint for document indexing
+- Enhanced `/api/ebot/status` to show all provider availability
+
+### New Features
+- **eDocs**: Comments panel with threaded replies, resolve/unresolve
+- **eDocs**: Document comments API (`/api/documents/:id/comments`)
+- **eConnect**: Message reactions component with emoji picker
+- **eNotes**: TopBar, StatusBar, and Drawing Canvas components
+- **eSheets**: Real-time collaboration hook with cell-level locking
+- **eSlides**: Real-time collaboration hook with slide-level awareness
+- **Cross-App**: Notification center with bell icon, unread count, toast notifications
+- **Cross-App**: Notifications API (`/api/notifications`)
+
+### PWA & Mobile
+- Rewrote service worker with network-first API strategy and offline queue
+- Enhanced PWA manifest with all icon sizes, shortcuts, share target
+- Added shared responsive CSS with mobile breakpoints and print styles
+
+### Production Infrastructure
+- Fixed Dockerfile multi-stage build for all 12 apps
+- Added `.dockerignore` for optimized Docker builds
+- Fixed `docker-compose.yml` with required secrets, data volumes, health checks
+- Added GitHub Actions CI/CD pipeline (lint, test, E2E, Docker build)
+- Enhanced health endpoint with version, uptime, memory stats
+- Added readiness probe endpoint (`/api/ready`)
+
+### Testing
+- Added Playwright E2E test infrastructure with multi-browser support
+- Added auth flow E2E tests (register, login, invalid credentials)
+- Added eDocs, eMail, eConnect E2E tests
+- Added cross-app integration tests (health, auth, eBot status)
+
+### Documentation
+- Added `.env.example` with all configurable environment variables
+- Updated README with quick start, AI provider config, storage info
+- Updated CHANGELOG with v2.0.0 release notes
+
+
+
 All notable changes to the eOffice Suite project will be documented in this file.
 
 ## [1.0.0] — 2026-04-03

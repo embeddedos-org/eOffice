@@ -104,3 +104,93 @@ documentsRouter.delete('/:id', (req: Request, res: Response) => {
   store.delete(req.params.id);
   res.status(204).send();
 });
+
+
+// --- Document Comments ---
+interface DocComment {
+  id: string;
+  documentId: string;
+  text: string;
+  author: string;
+  authorId: string;
+  timestamp: string;
+  resolved: boolean;
+  selectionText?: string;
+  replies: Array<{
+    id: string;
+    text: string;
+    author: string;
+    authorId: string;
+    timestamp: string;
+  }>;
+}
+
+const commentsStore = new FileStore<DocComment>(path.join(os.homedir(), '.eoffice', 'data', 'doc-comments'));
+
+// GET /api/documents/:id/comments
+documentsRouter.get('/:id/comments', (req: Request, res: Response) => {
+  const docId = req.params.id;
+  const comments = commentsStore.list().filter(c => c.documentId === docId);
+  res.json(comments);
+});
+
+// POST /api/documents/:id/comments
+documentsRouter.post('/:id/comments', (req: Request, res: Response) => {
+  const user = (req as AuthRequest).user;
+  if (!user) { res.status(401).json({ error: 'Authentication required' }); return; }
+  const { text, selectionText } = req.body;
+  if (!text) { res.status(400).json({ error: 'text is required' }); return; }
+
+  const comment: DocComment = {
+    id: crypto.randomUUID(),
+    documentId: req.params.id,
+    text,
+    author: user.username,
+    authorId: user.id,
+    timestamp: new Date().toISOString(),
+    resolved: false,
+    selectionText,
+    replies: [],
+  };
+  commentsStore.set(comment.id, comment);
+  res.status(201).json(comment);
+});
+
+// POST /api/documents/:id/comments/:commentId/reply
+documentsRouter.post('/:id/comments/:commentId/reply', (req: Request, res: Response) => {
+  const user = (req as AuthRequest).user;
+  if (!user) { res.status(401).json({ error: 'Authentication required' }); return; }
+  const comment = commentsStore.get(req.params.commentId);
+  if (!comment) { res.status(404).json({ error: 'Comment not found' }); return; }
+  const { text } = req.body;
+  if (!text) { res.status(400).json({ error: 'text is required' }); return; }
+
+  comment.replies.push({
+    id: crypto.randomUUID(),
+    text,
+    author: user.username,
+    authorId: user.id,
+    timestamp: new Date().toISOString(),
+  });
+  commentsStore.set(comment.id, comment);
+  res.json(comment);
+});
+
+// PUT /api/documents/:id/comments/:commentId/resolve
+documentsRouter.put('/:id/comments/:commentId/resolve', (req: Request, res: Response) => {
+  const comment = commentsStore.get(req.params.commentId);
+  if (!comment) { res.status(404).json({ error: 'Comment not found' }); return; }
+  comment.resolved = !comment.resolved;
+  commentsStore.set(comment.id, comment);
+  res.json(comment);
+});
+
+// DELETE /api/documents/:id/comments/:commentId
+documentsRouter.delete('/:id/comments/:commentId', (req: Request, res: Response) => {
+  const userId = (req as AuthRequest).user?.id;
+  const comment = commentsStore.get(req.params.commentId);
+  if (!comment) { res.status(404).json({ error: 'Comment not found' }); return; }
+  if (comment.authorId !== userId) { res.status(403).json({ error: 'Cannot delete others\' comments' }); return; }
+  commentsStore.delete(req.params.commentId);
+  res.status(204).end();
+});

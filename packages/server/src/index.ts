@@ -16,6 +16,7 @@ import { databasesRouter } from './routes/databases';
 import { driveRouter } from './routes/drive';
 import { connectRouter } from './routes/connect';
 import { swayRouter } from './routes/sway';
+import { notificationsRouter } from './routes/notifications';
 import { auditLog } from './middleware/audit';
 import { sanitizeBody } from './middleware/sanitize';
 import { authenticateToken } from './middleware/auth';
@@ -24,14 +25,20 @@ import { globalLimiter, ebotLimiter } from './middleware/rate-limit';
 import { setupCollaboration } from './services/collaboration';
 import { setupSignaling } from './services/signaling';
 import { setupChat } from './services/chat';
+import { logger } from './services/logger';
+import { requestLogger } from './middleware/request-logger';
+import { startAutoBackup, stopAutoBackup } from './services/backup';
+import { backupRouter } from './routes/backup';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
 
-const allowedOrigins = (
-  process.env.CORS_ORIGINS ||
-  'http://localhost:5170,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176,http://localhost:5177,http://localhost:5178,http://localhost:5179,http://localhost:5180,http://localhost:5181,http://localhost:5182,http://localhost:5183'
-).split(',');
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+  : [
+      // Default development origins (Vite dev servers)
+      ...Array.from({ length: 14 }, (_, i) => `http://localhost:${5170 + i}`),
+    ];
 
 // Security headers
 app.use(securityHeaders);
@@ -52,9 +59,23 @@ app.use(globalLimiter);
 app.use(auditLog);
 app.use(sanitizeBody);
 
-// Health endpoint — minimal info, no auth required
+// Health endpoint — detailed readiness check, no auth required
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok' });
+  res.json({
+    status: 'ok',
+    version: '2.0.0',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    memory: {
+      rss: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+    },
+  });
+});
+
+// Readiness probe
+app.get('/api/ready', (_req, res) => {
+  res.json({ ready: true, storage: process.env.STORAGE_BACKEND || 'sqlite' });
 });
 
 // Auth routes — no auth required
@@ -74,6 +95,7 @@ app.use('/api/databases', authenticateToken, databasesRouter);
 app.use('/api/drive', authenticateToken, driveRouter);
 app.use('/api/connect', authenticateToken, connectRouter);
 app.use('/api/sway', authenticateToken, swayRouter);
+app.use('/api/notifications', authenticateToken, notificationsRouter);
 
 // Create HTTP server for WebSocket upgrade
 const server = http.createServer(app);
@@ -83,20 +105,23 @@ const collabWss = setupCollaboration(server);
 const signalWss = setupSignaling(server);
 const chatWss = setupChat(server);
 
-server.listen(PORT, () => {
-  console.log(`eOffice Server v0.2.0 listening on port ${PORT}`);
-  console.log(`  REST API:    http://localhost:${PORT}/api`);
-  console.log(`  WebSocket:   ws://localhost:${PORT}/ws/collab (collaboration)`);
-  console.log(`  WebSocket:   ws://localhost:${PORT}/ws/signal (video calling)`);
-  console.log(`  WebSocket:   ws://localhost:${PORT}/ws/chat (real-time messaging)`);
+server.listen(PORT, '0.0.0.0', () => {
+  logger.info(`eOffice Server v2.0.0 listening on port ${PORT}`);
+  logger.info('REST API ready', { url: `http://localhost:${PORT}/api` });
+  logger.info('WebSocket services ready', { collab: '/ws/collab', signal: '/ws/signal', chat: '/ws/chat' });
+  // Start auto-backup in production
+  if (process.env.NODE_ENV === 'production') {
+    startAutoBackup();
+  }
 });
 
 // Graceful shutdown
 function gracefulShutdown(signal: string) {
-  console.log(`\n${signal} received. Shutting down gracefully...`);
+  logger.info(`${signal} received, shutting down...`);
+  stopAutoBackup();
 
   server.close(() => {
-    console.log('HTTP server closed.');
+    logger.info('HTTP server closed');
   });
 
   // Close WebSocket servers
@@ -122,7 +147,7 @@ function gracefulShutdown(signal: string) {
 
   // Force exit after 10 seconds
   setTimeout(() => {
-    console.error('Forced shutdown after timeout.');
+    logger.fatal('Forced shutdown after timeout');
     process.exit(1);
   }, 10000).unref();
 }

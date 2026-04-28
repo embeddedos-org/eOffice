@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import NoteList from './components/NoteList';
 import NoteEditor from './components/NoteEditor';
 import EBotPanel from './components/EBotPanel';
+import { LoginScreen } from '../../shared/LoginScreen';
 
 export interface Note {
   id: string;
@@ -73,7 +74,7 @@ function saveNotebooks(notebooks: Notebook[]): void {
   localStorage.setItem(NOTEBOOKS_KEY, JSON.stringify(notebooks));
 }
 
-export default function App() {
+function EnotesApp() {
   const [notes, setNotes] = useState<Note[]>(loadNotes);
   const [notebooks, setNotebooks] = useState<Notebook[]>(loadNotebooks);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -224,5 +225,14 @@ export default function App() {
         )}
       </div>
     </div>
+  );
+}
+
+
+export default function App() {
+  return (
+    <LoginScreen appName="eNotes" appIcon="📒">
+      <EnotesApp />
+    </LoginScreen>
   );
 }

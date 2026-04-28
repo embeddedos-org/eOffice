@@ -1,17 +1,46 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  eoffice-server:
-    build: .
+  eoffice:
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
-      - "3001:3001"
+      - "3001"  # Internal only, accessed via nginx
     environment:
       - NODE_ENV=production
-      - EBOT_HOST=192.168.1.100
-      - EBOT_PORT=8420
+      - PORT=3001
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3001}
+      - STORAGE_BACKEND=${STORAGE_BACKEND:-sqlite}
+      - EOFFICE_DB_PATH=/data/.eoffice/eoffice.db
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OLLAMA_URL=${OLLAMA_URL:-}
+      - EAI_BASE_URL=${EAI_BASE_URL:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - eoffice-data:/data/.eoffice
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
+
+  nginx:
+    build:
+      context: ./enterprise/nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./enterprise/nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - eoffice
+    restart: unless-stopped
+
+volumes:
+  eoffice-data:
+    driver: local

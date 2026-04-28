@@ -9,8 +9,9 @@ import StatusBar from './components/StatusBar';
 import { useConnect } from './hooks/useConnect';
 import { useEBot } from './hooks/useEBot';
 import { useVideoCall } from './hooks/useVideoCall';
+import { LoginScreen } from '../../shared/LoginScreen';
 
-export default function App() {
+function EconnectApp() {
   const [ebotOpen, setEbotOpen] = useState(false);
   const [showNewChannel, setShowNewChannel] = useState(false);
   const [newChannelName, setNewChannelName] = useState('');
@@ -134,5 +135,14 @@ export default function App() {
         connected={ebot.connected}
       />
     </div>
+  );
+}
+
+
+export default function App() {
+  return (
+    <LoginScreen appName="eConnect" appIcon="💬">
+      <EconnectApp />
+    </LoginScreen>
   );
 }

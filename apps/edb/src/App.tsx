@@ -11,8 +11,9 @@ import StatusBar from './components/StatusBar';
 import InputDialog, { ConfirmDialog } from '../../shared/InputDialog';
 import { useDatabase } from './hooks/useDatabase';
 import { useEBot } from './hooks/useEBot';
+import { LoginScreen } from '../../shared/LoginScreen';
 
-export default function App() {
+function EdbApp() {
   const [ebotOpen, setEbotOpen] = useState(false);
   const [currentView, setCurrentView] = useState<DBView>('table');
   const [showFormEntry, setShowFormEntry] = useState(false);
@@ -137,5 +138,14 @@ export default function App() {
         connected={ebot.connected}
       />
     </div>
+  );
+}
+
+
+export default function App() {
+  return (
+    <LoginScreen appName="eDB" appIcon="🗄️">
+      <EdbApp />
+    </LoginScreen>
   );
 }

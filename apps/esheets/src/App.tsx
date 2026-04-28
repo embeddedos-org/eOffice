@@ -11,6 +11,7 @@ import type { ChartType } from './components/Chart';
 import { useSpreadsheet } from './hooks/useSpreadsheet';
 import { useEBot } from './hooks/useEBot';
 import type { CellFormat } from '@eoffice/core';
+import { LoginScreen } from '../../shared/LoginScreen';
 
 interface ChartInstance {
   id: string;
@@ -22,7 +23,7 @@ interface ChartInstance {
   y: number;
 }
 
-export default function App() {
+function EsheetsApp() {
   const [title, setTitle] = useState('Untitled Spreadsheet');
   const [ebotSidebarOpen, setEbotSidebarOpen] = useState(false);
   const [ebotResponse, setEbotResponse] = useState('');
@@ -379,5 +380,14 @@ export default function App() {
         selectionRange={spreadsheet.selectionRange}
       />
     </div>
+  );
+}
+
+
+export default function App() {
+  return (
+    <LoginScreen appName="eSheets" appIcon="📊">
+      <EsheetsApp />
+    </LoginScreen>
   );
 }

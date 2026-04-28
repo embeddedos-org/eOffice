@@ -110,3 +110,6 @@ export class FileStore<T> implements DataStore<T> {
     }
   }
 }
+
+// Re-export createStore for convenient access
+export { createStore } from './sqlite-store';

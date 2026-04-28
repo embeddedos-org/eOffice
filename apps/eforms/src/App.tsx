@@ -8,8 +8,9 @@ import EBotSidebar from './components/EBotSidebar';
 import StatusBar from './components/StatusBar';
 import { useFormBuilder } from './hooks/useFormBuilder';
 import { useEBot } from './hooks/useEBot';
+import { LoginScreen } from '../../shared/LoginScreen';
 
-export default function App() {
+function EformsApp() {
   const [title, setTitle] = useState('Untitled Form');
   const [ebotOpen, setEbotOpen] = useState(false);
   const [ebotResponse, setEbotResponse] = useState('');
@@ -125,5 +126,14 @@ export default function App() {
         previewMode={form.previewMode}
       />
     </div>
+  );
+}
+
+
+export default function App() {
+  return (
+    <LoginScreen appName="eForms" appIcon="📋">
+      <EformsApp />
+    </LoginScreen>
   );
 }

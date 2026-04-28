@@ -165,7 +165,8 @@
   },
   "dependencies": {
     "electron-is-dev": "^2.0.0",
-    "electron-updater": "^6.3.0"
+    "electron-updater": "^6.3.0",
+    "@sentry/electron": "^5.7.0"
   },
   "devDependencies": {
     "electron": "^28.1.0",

@@ -2,7 +2,7 @@
   "name": "eoffice",
   "version": "1.0.0",
   "private": true,
-  "description": "eOffice Suite — AI-powered office productivity with eBot",
+  "description": "eOffice Suite \u2014 AI-powered office productivity with eBot",
   "workspaces": [
     "packages/core",
     "packages/ebot-client",
@@ -57,5 +57,8 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@sentry/react": "^8.40.0"
+  }
 }

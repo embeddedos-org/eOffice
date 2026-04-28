@@ -1,4 +1,8 @@
 import 'dotenv/config';
+import { initSentry, sentryErrorHandler } from './services/sentry';
+
+// Initialize Sentry before anything else
+initSentry();
 import express from 'express';
 import cors from 'cors';
 import http from 'http';
@@ -113,6 +117,9 @@ app.use('/api/drive', authenticateToken, driveRouter);
 app.use('/api/connect', authenticateToken, connectRouter);
 app.use('/api/sway', authenticateToken, swayRouter);
 app.use('/api/notifications', authenticateToken, notificationsRouter);
+
+// Sentry error handler (must be after all routes)
+app.use(sentryErrorHandler());
 
 // Create HTTP server for WebSocket upgrade
 const server = http.createServer(app);

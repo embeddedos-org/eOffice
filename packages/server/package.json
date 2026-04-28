@@ -24,7 +24,8 @@
     "mailparser": "^3.6.9",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.8",
-    "ws": "^8.16.0"
+    "ws": "^8.16.0",
+    "@sentry/node": "^8.40.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",

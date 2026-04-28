@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, shell, Menu, session } = require('electron');
 const { initAutoUpdater } = require('./auto-updater');
+const { initDesktopSentry } = require('./sentry');
 const path = require('path');
 const fs = require('fs');
 
@@ -231,6 +232,7 @@ ipcMain.handle('open-app', (_event, appId) => {
 ipcMain.handle('go-home', () => loadApp('launcher'));
 
 app.whenReady().then(() => {
+  initDesktopSentry();
   createWindow();
   initAutoUpdater();
 });

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { logger } from '../services/logger';
+import { recordRequest, activeConnections } from '../services/metrics';
 
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
   const requestId = logger.generateRequestId();
@@ -7,6 +8,9 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
 
   // Attach request ID to response headers
   res.setHeader('X-Request-Id', requestId);
+
+  activeConnections.inc();
+  res.on('close', () => activeConnections.dec());
 
   // Log on response finish
   res.on('finish', () => {
@@ -20,6 +24,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       ip: req.ip || req.socket.remoteAddress,
       userAgent: req.get('user-agent')?.substring(0, 100),
     };
+
+    recordRequest(req.method, req.originalUrl, res.statusCode, duration);
 
     if (res.statusCode >= 500) {
       logger.error('Request failed', logData);

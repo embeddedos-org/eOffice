@@ -26,6 +26,7 @@ import { setupCollaboration } from './services/collaboration';
 import { setupSignaling } from './services/signaling';
 import { setupChat } from './services/chat';
 import { logger } from './services/logger';
+import { generateMetrics } from './services/metrics';
 import { requestLogger } from './middleware/request-logger';
 import { startAutoBackup, stopAutoBackup } from './services/backup';
 import { backupRouter } from './routes/backup';
@@ -71,6 +72,12 @@ app.get('/api/health', (_req, res) => {
       heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
     },
   });
+});
+
+// Prometheus metrics endpoint — no auth required
+app.get('/metrics', (_req, res) => {
+  res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+  res.send(generateMetrics());
 });
 
 // Readiness probe

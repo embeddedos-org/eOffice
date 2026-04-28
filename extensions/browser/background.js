@@ -1,3 +1,12 @@
+// --- Configurable server URL ---
+async function getServerUrl() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(['serverUrl'], (data) => {
+      resolve(data.serverUrl || 'http://localhost:3001');
+    });
+  });
+}
+
 // eOffice Suite — Chrome Extension Background Service Worker
 
 const APP_PAGES = {

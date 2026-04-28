@@ -1,10 +1,17 @@
 {
   "manifest_version": 3,
   "name": "eOffice Suite",
-  "version": "0.1.0",
-  "description": "AI-powered office suite — eDocs, eNotes, eSheets & more. Works offline.",
-  "permissions": ["storage", "offscreen", "contextMenus"],
-  "host_permissions": ["http://localhost:3001/*"],
+  "version": "2.0.0",
+  "description": "AI-powered office suite \u2014 eDocs, eNotes, eSheets & more. Works offline.",
+  "permissions": [
+    "storage",
+    "offscreen",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "http://localhost:3001/*",
+    "https://*/*"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -34,5 +41,6 @@
       "id": "eoffice@embeddedos.org",
       "strict_min_version": "109.0"
     }
-  }
+  },
+  "update_url": "https://eoffice-releases.s3.amazonaws.com/extension/updates.xml"
 }

@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, shell, Menu, session } = require('electron');
+const { initAutoUpdater } = require('./auto-updater');
 const path = require('path');
 const fs = require('fs');
 
@@ -113,6 +114,7 @@ function createWindow() {
       submenu: [
         { label: '🚀 Home (Launcher)', click: () => loadApp('launcher') },
         { type: 'separator' },
+        { label: 'Check for Updates...', click: () => { const { autoUpdater } = require('electron-updater'); autoUpdater.checkForUpdates(); } },
         { label: 'About eOffice', click: () => showAbout() },
         { type: 'separator' },
         { label: 'Quit', accelerator: 'CmdOrCtrl+Q', click: () => app.quit() },
@@ -182,7 +184,7 @@ function showAbout() {
   dialog.showMessageBox(mainWindow, {
     type: 'info',
     title: 'About eOffice Suite',
-    message: 'eOffice Suite v1.0.0',
+    message: `eOffice Suite v${app.getVersion()}`,
     detail:
       'AI-powered office productivity suite with eBot.\n\n12 apps: eMail, eDocs, eNotes, eSheets, eSlides, eDB, eDrive, eConnect, eForms, eSway, ePlanner + Launcher.\n\n© 2026 EoS Project',
   });
@@ -228,7 +230,10 @@ ipcMain.handle('open-app', (_event, appId) => {
 
 ipcMain.handle('go-home', () => loadApp('launcher'));
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+  initAutoUpdater();
+});
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });

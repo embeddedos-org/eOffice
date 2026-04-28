@@ -49,10 +49,14 @@ jobs:
         run: cd desktop && npm install
 
       - name: Build desktop app
-        run: cd desktop && npx electron-builder ${{ matrix.target }}
+        run: cd desktop && npx electron-builder ${{ matrix.target }} --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          EOFFICE_S3_BUCKET: ${{ secrets.EOFFICE_S3_BUCKET }}
+          EOFFICE_S3_REGION: ${{ secrets.EOFFICE_S3_REGION }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -64,3 +68,6 @@ jobs:
             desktop/dist/*.AppImage
             desktop/dist/*.deb
             desktop/dist/*.nsis.7z
+            desktop/dist/*.yml
+            desktop/dist/*.yaml
+            desktop/dist/*.blockmap

@@ -145,10 +145,27 @@
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico"
-    }
+    },
+    "publish": [
+      {
+        "provider": "s3",
+        "bucket": "${EOFFICE_S3_BUCKET}",
+        "region": "${EOFFICE_S3_REGION}",
+        "path": "desktop-releases",
+        "acl": "public-read"
+      },
+      {
+        "provider": "github",
+        "owner": "embeddedos-org",
+        "repo": "eOffice"
+      }
+    ],
+    "asar": true,
+    "generateUpdatesFilesForAllChannels": true
   },
   "dependencies": {
-    "electron-is-dev": "^2.0.0"
+    "electron-is-dev": "^2.0.0",
+    "electron-updater": "^6.3.0"
   },
   "devDependencies": {
     "electron": "^28.1.0",

@@ -15,11 +15,14 @@ permissions:
   contents: read
   packages: write
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-typecheck:
     name: Lint & Typecheck
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v2
@@ -36,7 +39,6 @@ jobs:
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v2
@@ -54,7 +56,6 @@ jobs:
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     needs: test
     steps:
       - uses: actions/checkout@v4
@@ -68,14 +69,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @eoffice/core build
       - run: npx playwright install --with-deps chromium
-      - run: cd e2e && npx playwright test || echo "E2E browser tests skipped in CI"
+      - run: cd e2e && npx playwright test
         env:
           JWT_SECRET: test-jwt-secret-for-ci
 
   docker-build-push:
     name: Docker Build & Push
     runs-on: ubuntu-latest
-    continue-on-error: true
     needs: [test, e2e]
     steps:
       - uses: actions/checkout@v4
@@ -108,7 +108,7 @@ jobs:
             type=ref,event=pr
 
       - name: Build and push eOffice API image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') }}
@@ -120,7 +120,7 @@ jobs:
 
       - name: Build and push Nginx image
         if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./enterprise/nginx
           file: ./enterprise/nginx/Dockerfile

@@ -1,6 +1,6 @@
 {
   "name": "eoffice-desktop",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "eOffice Suite \u2014 Desktop App for Windows, macOS, Linux",
   "main": "main.js",
   "scripts": {

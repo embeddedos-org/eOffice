@@ -5,3 +5,10 @@ dist/
 .DS_Store
 Thumbs.db
 *.tsbuildinfo
+build/
+build-*/
+__pycache__/
+*.pyc
+.venv/
+target/
+.pytest_cache/

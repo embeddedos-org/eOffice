@@ -1,7 +1,7 @@
 {
   "name": "eoffice-office365-addin",
-  "version": "1.0.0",
-  "description": "eOffice Add-in for Microsoft 365 — eBot AI, eDocs, eSheets integration",
+  "version": "3.0.0",
+  "description": "eOffice Add-in for Microsoft 365 \u2014 eBot AI, eDocs, eSheets integration",
   "main": "src/taskpane/taskpane.js",
   "scripts": {
     "build": "webpack --mode production",

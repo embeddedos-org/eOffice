@@ -1,7 +1,7 @@
 {
   "name": "eoffice-obsidian",
-  "version": "0.1.0",
-  "description": "Obsidian plugin for eOffice Suite — sync eNotes, eBot AI assistant",
+  "version": "3.0.0",
+  "description": "Obsidian plugin for eOffice Suite \u2014 sync eNotes, eBot AI assistant",
   "main": "main.js",
   "license": "MIT",
   "scripts": {

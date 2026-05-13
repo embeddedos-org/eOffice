@@ -1,7 +1,7 @@
 {
   "name": "eoffice-github-app",
-  "version": "1.0.0",
-  "description": "eOffice GitHub App — eBot AI code review, issue tracking, and changelog generation",
+  "version": "3.0.0",
+  "description": "eOffice GitHub App \u2014 eBot AI code review, issue tracking, and changelog generation",
   "main": "src/index.js",
   "scripts": {
     "start": "probot run ./src/index.js",

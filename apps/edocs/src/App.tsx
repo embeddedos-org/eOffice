@@ -10,6 +10,7 @@ import { useCollab } from './hooks/useCollab';
 import { API_URL, apiClient, getUser } from '../../shared/config';
 import { LoginScreen } from '../../shared/LoginScreen';
 import { exportToDocx, exportToPdf, exportToHtml, exportToMarkdown } from '@eoffice/core/src/file-export';
+import { sanitizeHtml } from '@eoffice/core';
 
 interface FormatState {
   bold: boolean;
@@ -133,7 +134,9 @@ function EdocsApp() {
     const unsubscribe = collab.onRemoteEdit((remoteHtml: string) => {
       if (editorRef.current) {
         isRemoteUpdate.current = true;
-        editorRef.current.innerHTML = remoteHtml;
+        // SECURITY: remote HTML from collaborators must be sanitized
+        // before injection to prevent stored DOM-XSS attacks.
+        editorRef.current.innerHTML = sanitizeHtml(remoteHtml);
         setContent(editorRef.current.innerText || '');
         computeStats(editorRef.current.innerText || '');
         isRemoteUpdate.current = false;
@@ -319,7 +322,7 @@ function EdocsApp() {
       setActiveDocId(newDoc.id);
       setTitle(newDoc.title);
       if (editorRef.current) {
-        editorRef.current.innerHTML = newDoc.content;
+        editorRef.current.innerHTML = sanitizeHtml(newDoc.content);
       }
       setContent(editorRef.current?.innerText || '');
       computeStats(editorRef.current?.innerText || '');
@@ -336,7 +339,7 @@ function EdocsApp() {
       setActiveDocId(doc.id);
       setTitle(doc.title);
       if (editorRef.current) {
-        editorRef.current.innerHTML = doc.content;
+        editorRef.current.innerHTML = sanitizeHtml(doc.content);
       }
       setContent(editorRef.current?.innerText || '');
       computeStats(editorRef.current?.innerText || '');

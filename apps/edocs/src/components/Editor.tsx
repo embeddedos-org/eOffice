@@ -108,7 +108,15 @@ const Editor = forwardRef<HTMLDivElement, EditorProps>(
       const el = editorEl.current;
       if (!el || !findText) return;
       const regex = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-      el.innerHTML = el.innerHTML.replace(regex, replaceText);
+      // SECURITY: escape replacement text before injecting into HTML to prevent
+      // DOM-XSS via crafted find/replace values.
+      const escapedReplacement = replaceText
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+      el.innerHTML = el.innerHTML.replace(regex, escapedReplacement);
       handleInput();
       setMatchCount(0);
     }, [editorEl, findText, replaceText, handleInput]);

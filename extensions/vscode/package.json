@@ -2,7 +2,7 @@
   "name": "eoffice-vscode",
   "displayName": "eOffice Suite",
   "description": "Open Excel, CSV, database files with eDocs, eSheets, eNotes & eBot AI",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "publisher": "embeddedos",
   "license": "MIT",
   "engines": {

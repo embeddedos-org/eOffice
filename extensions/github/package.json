@@ -1,6 +1,6 @@
 {
   "name": "eoffice-github-app",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "eOffice GitHub App \u2014 eBot AI code review, issue tracking, and changelog generation",
   "main": "src/index.js",
   "scripts": {

@@ -1,6 +1,6 @@
 {
   "name": "eoffice-slack",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Slack integration for eOffice Suite \u2014 eDocs, eNotes, eSheets, eBot AI & more",
   "main": "app.js",
   "license": "MIT",

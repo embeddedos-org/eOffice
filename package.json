@@ -1,6 +1,6 @@
 {
   "name": "eoffice",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "private": true,
   "description": "eOffice Suite \u2014 AI-powered office productivity with eBot",
   "workspaces": [

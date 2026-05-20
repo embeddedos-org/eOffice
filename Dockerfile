@@ -1,6 +1,6 @@
 # eOffice Multi-Stage Docker Build
 # Stage 1: Build all apps
-FROM node:20-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /app
 
@@ -44,7 +44,7 @@ RUN for app in edocs esheets eslides email econnect eplanner enotes edb edrive e
 RUN cd /app/packages/server && pnpm build || true
 
 # Stage 2: Production image
-FROM node:20-alpine AS production
+FROM node:26-alpine AS production
 
 WORKDIR /app
 

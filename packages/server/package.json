@@ -23,7 +23,7 @@
     "imapflow": "^1.0.162",
     "mailparser": "^3.6.9",
     "multer": "^1.4.5-lts.1",
-    "nodemailer": "^6.9.8",
+    "nodemailer": "^8.0.9",
     "ws": "^8.16.0",
     "@sentry/node": "^8.40.0"
   },
@@ -32,7 +32,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/multer": "^1.4.11",
-    "@types/nodemailer": "^6.4.14",
+    "@types/nodemailer": "^8.0.0",
     "@types/supertest": "^7.2.0",
     "@types/ws": "^8.5.10",
     "supertest": "^7.2.2",

@@ -1,0 +1,9 @@
+{
+  "app": { "name": "eOffice", "tagline": "全球最先进的办公套件", "version": "1.0.0" },
+  "nav": { "home": "首页", "writer": "文字处理", "calc": "电子表格", "impress": "演示文稿", "pdf": "PDF", "files": "文件", "templates": "模板", "settings": "设置", "help": "帮助", "about": "关于" },
+  "actions": { "new": "新建", "open": "打开", "save": "保存", "saveAs": "另存为", "export": "导出", "import": "导入", "print": "打印", "share": "分享", "close": "关闭", "undo": "撤销", "redo": "重做", "cut": "剪切", "copy": "复制", "paste": "粘贴", "delete": "删除", "selectAll": "全选", "find": "查找", "replace": "替换", "cancel": "取消", "confirm": "确认", "apply": "应用", "ok": "确定", "yes": "是", "no": "否", "search": "搜索", "filter": "筛选", "sort": "排序", "refresh": "刷新", "download": "下载", "upload": "上传", "rename": "重命名", "duplicate": "复制", "move": "移动", "create": "创建", "edit": "编辑", "view": "查看", "preview": "预览", "fullscreen": "全屏", "exitFullscreen": "退出全屏", "zoomIn": "放大", "zoomOut": "缩小", "resetZoom": "重置缩放" },
+  "file": { "newDocument": "新建文档", "newSpreadsheet": "新建电子表格", "newPresentation": "新建演示文稿", "recentFiles": "最近文件", "noRecentFiles": "无最近文件", "untitled": "无标题", "saved": "已保存", "saving": "保存中...", "unsavedChanges": "未保存的更改", "autoSaved": "自动保存", "lastModified": "最后修改", "fileSize": "文件大小", "fileType": "文件类型", "createdAt": "创建时间", "modifiedAt": "修改时间" },
+  "ai": { "assistant": "AI 助手", "askAI": "询问 AI", "generate": "生成", "improve": "改善写作", "summarize": "摘要", "translate": "翻译", "explain": "解释", "fix": "语法修正", "expand": "扩展", "shorten": "缩短", "rewrite": "重写", "suggestions": "AI 建议", "analyzing": "分析中...", "generating": "生成中...", "placeholder": "向 AI 询问有关文档的任何问题..." },
+  "status": { "loading": "加载中...", "saving": "保存中...", "saved": "已保存", "error": "错误", "success": "成功", "warning": "警告", "info": "信息", "offline": "您已离线", "online": "已重新连接", "syncing": "同步中...", "synced": "已同步" },
+  "errors": { "generic": "出现错误，请重试。", "network": "网络错误，请检查您的连接。", "notFound": "文件未找到。", "saveFailed": "保存失败，请重试。", "loadFailed": "文件加载失败。" }
+}

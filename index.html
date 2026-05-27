@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1a56db" />
+    <meta name="description" content="eOffice - The world's most advanced open-source office suite. Write, calculate, present, and collaborate from anywhere." />
+    <meta name="keywords" content="office suite, word processor, spreadsheet, presentation, PDF, collaboration, AI" />
+    <meta name="author" content="eOffice Team" />
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="eOffice - Advanced Office Suite" />
+    <meta property="og:description" content="The world's most advanced open-source office suite" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://eoffice.app" />
+    <meta property="og:image" content="https://eoffice.app/og-image.png" />
+    
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="eOffice - Advanced Office Suite" />
+    <meta name="twitter:description" content="The world's most advanced open-source office suite" />
+    
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    
+    <!-- Security -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="X-Frame-Options" content="SAMEORIGIN" />
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+    
+    <title>eOffice - Advanced Office Suite</title>
+    
+    <style>
+      /* Critical CSS for fast initial render */
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html { font-family: Inter, system-ui, sans-serif; -webkit-text-size-adjust: 100%; }
+      body { background: #f8fafc; color: #0f172a; min-height: 100vh; }
+      #root { min-height: 100vh; display: flex; flex-direction: column; }
+      .splash-screen {
+        position: fixed; inset: 0; background: linear-gradient(135deg, #1a56db 0%, #7c3aed 100%);
+        display: flex; align-items: center; justify-content: center; z-index: 9999;
+        transition: opacity 0.5s ease;
+      }
+      .splash-logo { color: white; font-size: 2rem; font-weight: 800; letter-spacing: -0.05em; }
+      .splash-logo span { color: #93c5fd; }
+    </style>
+  </head>
+  <body>
+    <div id="splash" class="splash-screen">
+      <div class="splash-logo">e<span>Office</span></div>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Remove splash screen after app loads
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const splash = document.getElementById('splash');
+          if (splash) { splash.style.opacity = '0'; setTimeout(() => splash.remove(), 500); }
+        }, 800);
+      });
+    </script>
+  </body>
+</html>

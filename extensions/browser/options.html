@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>eOffice Extension Settings</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 24px; max-width: 500px; margin: 0 auto; background: #f8f9fa; }
+    h1 { font-size: 20px; color: #1a1a2e; margin-bottom: 24px; }
+    .field { margin-bottom: 16px; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 4px; }
+    input { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+    input:focus { border-color: #667eea; outline: none; }
+    button { padding: 8px 20px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
+    button:hover { opacity: 0.9; }
+    .status { margin-top: 12px; padding: 8px 12px; border-radius: 6px; font-size: 13px; display: none; }
+    .status.success { display: block; background: #e8f5e9; color: #2e7d32; }
+    .status.error { display: block; background: #ffebee; color: #c62828; }
+    .version { color: #999; font-size: 12px; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <h1>eOffice Settings</h1>
+
+  <div class="field">
+    <label>Server URL</label>
+    <input type="url" id="serverUrl" placeholder="http://localhost:3001" />
+  </div>
+
+  <div class="field">
+    <label>Auth Token (optional — auto-filled on login)</label>
+    <input type="password" id="authToken" placeholder="Bearer token" />
+  </div>
+
+  <button id="save">Save Settings</button>
+  <div class="status" id="status"></div>
+
+  <div class="field" style="margin-top: 24px;">
+    <button id="testConnection" style="background: #4caf50;">Test Connection</button>
+  </div>
+
+  <p class="version" id="version"></p>
+
+  <script>
+    const serverUrl = document.getElementById('serverUrl');
+    const authToken = document.getElementById('authToken');
+    const statusEl = document.getElementById('status');
+
+    // Load saved settings
+    chrome.storage.sync.get(['serverUrl', 'authToken'], (data) => {
+      serverUrl.value = data.serverUrl || 'http://localhost:3001';
+      authToken.value = data.authToken || '';
+    });
+
+    // Show version
+    document.getElementById('version').textContent =
+      `eOffice Extension v${chrome.runtime.getManifest().version}`;
+
+    // Save
+    document.getElementById('save').addEventListener('click', () => {
+      chrome.storage.sync.set({
+        serverUrl: serverUrl.value.replace(/\/$/, ''),
+        authToken: authToken.value,
+      }, () => {
+        statusEl.className = 'status success';
+        statusEl.textContent = 'Settings saved!';
+        setTimeout(() => statusEl.style.display = 'none', 3000);
+      });
+    });
+
+    // Test connection
+    document.getElementById('testConnection').addEventListener('click', async () => {
+      try {
+        const url = serverUrl.value.replace(/\/$/, '');
+        const res = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(5000) });
+        const data = await res.json();
+        statusEl.className = 'status success';
+        statusEl.textContent = `Connected! Server v${data.version}, uptime ${Math.round(data.uptime)}s`;
+      } catch (err) {
+        statusEl.className = 'status error';
+        statusEl.textContent = `Connection failed: ${err.message}`;
+      }
+      statusEl.style.display = 'block';
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,181 @@
+{
+  "name": "eoffice-desktop",
+  "version": "3.0.1",
+  "description": "eOffice Suite \u2014 Desktop App for Windows, macOS, Linux",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder --win --mac --linux",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "org.embeddedos.eoffice",
+    "forceCodeSigning": false,
+    "productName": "eOffice Suite",
+    "copyright": "Copyright \u00a9 2026 EoS Project",
+    "files": [
+      "main.js",
+      "preload.js",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../browser",
+        "to": "browser",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../apps/email/dist",
+        "to": "email-app",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../apps/edocs/dist",
+        "to": "edocs-app",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../apps/enotes/dist",
+        "to": "enotes-app",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../apps/esheets/dist",
+        "to": "esheets-app",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../apps/eslides/dist",
+        "to": "eslides-app",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../apps/edb/dist",
+        "to": "edb-app",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../apps/edrive/dist",
+        "to": "edrive-app",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../apps/econnect/dist",
+        "to": "econnect-app",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../apps/eforms/dist",
+        "to": "eforms-app",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../apps/esway/dist",
+        "to": "esway-app",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../apps/eplanner/dist",
+        "to": "eplanner-app",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../apps/launcher/dist",
+        "to": "launcher-app",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": [
+        "zip"
+      ],
+      "icon": "assets/icon.png",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "assets/icon.png",
+      "category": "Office"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico"
+    },
+    "publish": [
+      {
+        "provider": "s3",
+        "bucket": "${EOFFICE_S3_BUCKET}",
+        "region": "${EOFFICE_S3_REGION}",
+        "path": "desktop-releases",
+        "acl": "public-read"
+      },
+      {
+        "provider": "github",
+        "owner": "embeddedos-org",
+        "repo": "eOffice"
+      }
+    ],
+    "asar": true,
+    "generateUpdatesFilesForAllChannels": true
+  },
+  "dependencies": {
+    "electron-is-dev": "^2.0.0",
+    "electron-updater": "^6.3.0",
+    "@sentry/electron": "^5.7.0"
+  },
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1"
+  },
+  "author": {
+    "name": "EoS Project",
+    "email": "eos@embeddedos.org"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/embeddedos-org/eOffice"
+}

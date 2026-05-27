@@ -1,0 +1,80 @@
+name: Build Desktop Apps
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            target: --win
+            artifact: windows
+          - os: macos-latest
+            target: --mac
+            artifact: macos
+          - os: ubuntu-latest
+            target: --linux
+            artifact: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install project dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build core package
+        run: pnpm --filter @eoffice/core build
+
+      - name: Build all 12 frontend apps
+        run: |
+          for app in edocs esheets eslides email econnect eplanner enotes edb edrive eforms esway launcher; do
+            echo "Building $app..."
+            cd apps/$app && pnpm build && cd ../..
+          done
+        shell: bash
+
+      - name: Install desktop dependencies
+        run: cd desktop && npm install
+
+      - name: Build desktop app
+        run: cd desktop && npx electron-builder ${{ matrix.target }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          EOFFICE_S3_BUCKET: ${{ secrets.EOFFICE_S3_BUCKET }}
+          EOFFICE_S3_REGION: ${{ secrets.EOFFICE_S3_REGION }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eoffice-desktop-${{ matrix.artifact }}
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/*.dmg
+            desktop/dist/*.zip
+            desktop/dist/*.AppImage
+            desktop/dist/*.deb
+            desktop/dist/*.nsis.7z
+            desktop/dist/*.yml
+            desktop/dist/*.yaml
+            desktop/dist/*.blockmap

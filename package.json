@@ -8,16 +8,18 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
+    "test": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest --config vitest.config.ts",
+    "test:coverage": "vitest run --config vitest.config.ts --coverage",
     "test:e2e": "playwright test",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "lint:fix": "eslint src --ext ts,tsx --fix",
     "format": "prettier --write src/**/*.{ts,tsx,css}",
     "type-check": "tsc --noEmit",
     "build:extension": "node scripts/build-extension.js",
-    "build:pwa": "vite build --mode pwa"
+    "build:pwa": "vite build --mode pwa",
+    "test:unit": "vitest run --config vitest.config.ts --reporter=verbose",
+    "test:all": "pnpm -r test"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -134,6 +136,14 @@
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
   },
-  "keywords": ["office", "editor", "spreadsheet", "presentation", "pdf", "collaboration", "ai"],
+  "keywords": [
+    "office",
+    "editor",
+    "spreadsheet",
+    "presentation",
+    "pdf",
+    "collaboration",
+    "ai"
+  ],
   "license": "Apache-2.0"
 }

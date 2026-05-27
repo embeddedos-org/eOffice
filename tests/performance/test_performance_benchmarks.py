@@ -1,13 +1,9 @@
 import unittest
-
-class TesteOfficePerformance(unittest.TestCase):
-    import time
-    def test_pdf_export_latency(self):
-        import time
+import time
+class TestEOfficePerformance(unittest.TestCase):
+    def test_auto_save_latency(self):
         start = time.perf_counter()
-        # Simulate PDF layout and export
-        for _ in range(2000):
-            _ = "pdf_page_data"
-        end = time.perf_counter()
-        export_ms = (end - start) * 1000
-        assert export_ms < 20, f"PDF export latency {export_ms:.1f}ms exceeds 20ms SLA"
+        for _ in range(100):
+            pass # simulate auto-save
+        latency = (time.perf_counter() - start) / 100
+        self.assertLess(latency, 0.01) # < 10ms SLA

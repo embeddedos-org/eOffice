@@ -55,7 +55,7 @@
     "@tiptap/extension-typography": "^2.7.2",
     "hyperformula": "^2.7.1",
     "lucide-react": "^0.462.0",
-    "framer-motion": "^11.11.1",
+    "framer-motion": "^12.40.0",
     "date-fns": "^4.1.0",
     "clsx": "^2.1.1",
     "tailwind-merge": "^2.5.4",

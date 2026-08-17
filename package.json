@@ -99,7 +99,7 @@
     "react-beautiful-dnd": "^13.1.1",
     "react-color": "^2.19.3",
     "highlight.js": "^11.10.0",
-    "katex": "^0.16.11",
+    "katex": "^0.18.4",
     "mermaid": "^11.4.0"
   },
   "devDependencies": {

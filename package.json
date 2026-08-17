@@ -54,7 +54,7 @@
     "@tiptap/extension-superscript": "^2.7.2",
     "@tiptap/extension-typography": "^2.7.2",
     "hyperformula": "^2.7.1",
-    "lucide-react": "^0.462.0",
+    "lucide-react": "^1.31.0",
     "framer-motion": "^11.11.1",
     "date-fns": "^4.1.0",
     "clsx": "^2.1.1",

@@ -1,98 +1,44 @@
-<!-- generated: eos-ai-scaffold -->
-# Agent Responsibilities
+# Repository Guidance for Agents
 
-Each role owns a slice of the work and does only that slice. Full briefs are in
-[.ai/](./.ai/). These are responsibilities, not a required agent count — one
-agent may hold several roles on a small change. Split when the roles need
-genuinely different context, not by default.
+## Scope and architecture
 
-One rule is structural rather than stylistic: **whoever implements does not
-approve.** Review is a separate role because self-review reliably misses the
-thing the implementer already believes is correct.
+eOffice is a pnpm-managed TypeScript and React monorepo. The Vite shell lives in
+`src/`, individual productivity applications and shared app code in `apps/`,
+shared libraries and services in `packages/`, browser builds in `browser/`, the
+Electron wrapper in `desktop/`, integrations in `extensions/`, and Playwright
+coverage in `e2e/`. A change to shared editing, storage, or collaboration
+contracts can affect several applications and must be checked across consumers.
 
-## Planner — [.ai/planner.md](./.ai/planner.md)
+Follow the specialist role briefs in [`.ai/`](./.ai/) and the handoff protocol in
+[`HANDOFF.md`](./HANDOFF.md). The implementer must not act as the approving
+reviewer. Keep app-specific work within its workspace package and avoid broad
+formatting or generated-lockfile churn.
 
-- Understand the request.
-- Break work into tasks.
-- Assign work.
+## Build and validation
 
-## Architect — [.ai/architect.md](./.ai/architect.md)
+Use the pinned package manager from `package.json`.
 
-- Design structure.
-- Choose patterns.
-- Own dependencies, scalability and maintainability.
+- Install with `pnpm install --frozen-lockfile`.
+- Run unit tests with `pnpm test`.
+- Run lint and type checks with `pnpm lint` and `pnpm type-check`.
+- Build the web application with `pnpm build`.
+- Run `pnpm test:e2e` for user workflows or cross-application behavior.
+- Use `pnpm build:pwa` or `pnpm build:extension` when those delivery targets
+  change.
 
-## Backend — [.ai/backend.md](./.ai/backend.md)
+Report any skipped browser, Electron, or platform validation and the missing
+runtime. Preserve accessible keyboard and screen-reader behavior in UI changes.
 
-- APIs
-- Database
-- Business logic
+## Change discipline
 
-## Frontend — [.ai/frontend.md](./.ai/frontend.md)
+Keep workspace dependencies declared in the owning package, preserve persisted
+document compatibility, and treat file import/export, HTML rendering, auth, and
+collaboration inputs as untrusted. Do not commit `node_modules`, build output,
+credentials, user documents, or generated packages.
 
-- UI
-- Components
-- Accessibility
-
-## Testing — [.ai/testing.md](./.ai/testing.md)
-
-- Unit tests
-- Integration tests
-- Regression tests
-
-## Security — [.ai/security.md](./.ai/security.md)
-
-- Authentication and authorization
-- Validation
-- Secrets
-- Dependency review
-
-## Performance — [.ai/performance.md](./.ai/performance.md)
-
-- Profiling
-- Optimization
-- Scalability
-
-## Reviewer — [.ai/reviewer.md](./.ai/reviewer.md)
-
-- Final review
-- Verify requirements
-- Merge findings
-
-## Documentation — [.ai/docs.md](./.ai/docs.md)
-
-- README
-- API docs
-- Changelog
-- Migration and architecture notes
-
-## Release — [.ai/release.md](./.ai/release.md)
-
-- Release notes
-- Deployment preparation
-- Rollback guidance
-
----
-
-## Switching roles
-
-Switch when the task changes domain, when specialist knowledge is required,
-when independent review is required, or when the context has grown past what
-one agent can hold accurately. Every switch runs the protocol in
-[HANDOFF.md](./HANDOFF.md).
-
-## Finding work that is not yours
-
-You will. The rule is: **record it, do not absorb it, do not drop it.**
-
-| What you found | Do |
-|----------------|-----|
-| A defect unrelated to your task | Note it in [TASKS.md](./TASKS.md) and keep going. |
-| A defect your change would sit on top of | Stop; say it blocks you; propose fixing it as its own task. |
-| A security issue | Report immediately, whatever role you hold. This one never waits for a handoff. |
-| A design decision missing from the plan | Return to the architect rather than deciding it inside an implementation. |
-| Work that belongs to a role nobody assigned | Say so. An unowned task is how requirements go missing. |
-
-Silently fixing something outside your task makes the diff unreviewable.
-Silently ignoring it means nobody ever looks again. Neither is acceptable; the
-note is what makes the difference.
+Every human-authored pull request must use a GitHub-recognized closing keyword
+for an issue in this repository, for example `Fixes #123`. Cross-repository
+issues and plain issue mentions do not satisfy the linked-issue policy. Follow
+[`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md), and
+keep the published Wiki snapshot in [`docs/wiki/`](./docs/wiki/) synchronized
+when Wiki content changes.

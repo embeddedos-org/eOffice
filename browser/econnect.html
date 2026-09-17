@@ -45,11 +45,11 @@ function rL(){var el=$('il'),q=$('sr').value.toLowerCase();el.innerHTML='';
 var fl=items.filter(function(x){return!q||JSON.stringify(x).toLowerCase().indexOf(q)>=0;});
 if(!fl.length){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--tx3);font-size:12px">No items</div>';return;}
 fl.forEach(function(item){var d=document.createElement('div');d.className='it'+(item.id===curId?' sel':'');
-d.innerHTML='<div class="it-t">'+esc(item.title||'Untitled')+'</div><div class="it-m">'+(item.meta||'')+'</div>';
+d.innerHTML='<div class="it-t">'+esc(item.title||'Untitled')+'</div><div class="it-m">'+esc(item.meta||'')+'</div>';
 d.onclick=function(){curId=item.id;render();};el.appendChild(d);});}
 function rD(){var el=$('det');if(!curId){el.innerHTML='<div class="de">&#128101;<br>Select a channel</div>';return;}
 var ch=items.find(function(x){return x.id===curId;});if(!ch)return;if(!ch.msgs)ch.msgs=[];
-var m=ch.msgs.map(function(m){return'<div style="padding:8px 12px;margin-bottom:4px;border-radius:6px;background:var(--bg3);font-size:13px"><b style="color:var(--ac);font-size:12px">'+esc(m.f)+'</b><span style="font-size:10px;color:var(--tx3);margin-left:8px">'+m.tm+'</span><div>'+esc(m.t)+'</div></div>';}).join('');
+var m=ch.msgs.map(function(m){return'<div style="padding:8px 12px;margin-bottom:4px;border-radius:6px;background:var(--bg3);font-size:13px"><b style="color:var(--ac);font-size:12px">'+esc(m.f)+'</b><span style="font-size:10px;color:var(--tx3);margin-left:8px">'+esc(m.tm)+'</span><div>'+esc(m.t)+'</div></div>';}).join('');
 el.innerHTML='<h2 style="margin-bottom:16px"># '+esc(ch.title)+'</h2><div>'+m+'</div><div style="display:flex;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--bd)"><input id="mi" style="flex:1;padding:8px 12px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font-size:13px;outline:0" placeholder="Message..." onkeydown="if(event.key===\'Enter\')sendM()"><button class="bp" style="width:auto;padding:8px 16px" onclick="sendM()">Send</button></div>';}
 window.sendM=function(){var i=document.getElementById('mi');if(!i||!i.value.trim())return;var ch=items.find(function(x){return x.id===curId;});if(!ch)return;if(!ch.msgs)ch.msgs=[];ch.msgs.push({f:'Me',t:i.value,tm:new Date().toLocaleTimeString('en',{hour:'numeric',minute:'2-digit'})});i.value='';save();rD();};
 $('aB').onclick=function(){var n=prompt('Channel name:');if(!n)return;items.push({id:uid(),title:n,meta:'New channel',msgs:[]});save();render();};

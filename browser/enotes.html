@@ -1078,7 +1078,7 @@ mark.search-highlight {
     });
 
     const countLabel = filterTag
-      ? `${filtered.length} note${filtered.length !== 1 ? 's' : ''} tagged "${filterTag}" <span style="cursor:pointer;color:var(--accent)" onclick="window._clearFilter()">✕ clear</span>`
+      ? `${filtered.length} note${filtered.length !== 1 ? 's' : ''} tagged "${escapeHtml(filterTag)}" <span style="cursor:pointer;color:var(--accent)" onclick="window._clearFilter()">✕ clear</span>`
       : `${filtered.length} note${filtered.length !== 1 ? 's' : ''}`;
     noteCount.innerHTML = countLabel;
 
@@ -1094,10 +1094,6 @@ mark.search-highlight {
       item.dataset.id = note.id;
 
       const preview = note.content.replace(/\n/g, ' ').slice(0, 60);
-      const tagsHtml = note.tags.map(t => {
-        const c = tagColor(t);
-        return `<span class="tag-pill" data-tag="${escapeHtml(t)}" style="background:${c.bg};color:${c.fg}" onclick="event.stopPropagation();window._filterByTag('${escapeHtml(t)}')">${escapeHtml(t)}</span>`;
-      }).join('');
 
       item.innerHTML = `
         <div class="note-item-title">
@@ -1107,9 +1103,29 @@ mark.search-highlight {
         <div class="note-item-preview">${highlightText(preview, searchQuery)}</div>
         <div class="note-item-meta">
           <span class="note-item-date">${relativeTime(note.updated_at)}</span>
-          <div class="note-item-tags">${tagsHtml}</div>
+          <div class="note-item-tags"></div>
         </div>
       `;
+
+      // Tag pills via DOM APIs: tags are user data (importable from JSON),
+      // so they must never flow through innerHTML or inline event handlers.
+      // (escapeHtml does not escape quotes, so the old inline onclick was
+      // breakable with a quote in the tag.)
+      const tagsContainer = item.querySelector('.note-item-tags');
+      note.tags.forEach(t => {
+        const tc = tagColor(t);
+        const pill = document.createElement('span');
+        pill.className = 'tag-pill';
+        pill.dataset.tag = t;
+        pill.textContent = t;
+        pill.style.background = tc.bg;
+        pill.style.color = tc.fg;
+        pill.addEventListener('click', e => {
+          e.stopPropagation();
+          window._filterByTag(t);
+        });
+        tagsContainer.appendChild(pill);
+      });
 
       item.addEventListener('click', () => selectNote(note.id));
       item.addEventListener('contextmenu', e => showContextMenu(e, note.id));
@@ -1317,7 +1333,12 @@ mark.search-highlight {
         if (!Array.isArray(imported)) throw new Error('Invalid format');
         imported.forEach(n => {
           if (!n.id) n.id = uuid();
-          if (!n.tags) n.tags = [];
+          // Trust boundary: imported JSON is untrusted. Coerce to the shapes
+          // the renderers expect so non-string values can't reach the DOM.
+          if (!Array.isArray(n.tags)) n.tags = [];
+          n.tags = n.tags.filter(t => typeof t === 'string');
+          if (typeof n.title !== 'string') n.title = '';
+          if (typeof n.content !== 'string') n.content = '';
           if (!n.created_at) n.created_at = new Date().toISOString();
           if (!n.updated_at) n.updated_at = new Date().toISOString();
           if (typeof n.pinned !== 'boolean') n.pinned = false;

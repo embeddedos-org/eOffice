@@ -172,7 +172,9 @@ export default function ImpressPage() {
         try {
           const parsed = JSON.parse(doc.content);
           if (parsed.slides) setPresentation(prev => ({ ...prev, slides: parsed.slides }));
-        } catch {}
+        } catch {
+          // Malformed content: keep the current presentation as-is.
+        }
       } else {
         navigate('/impress');
       }

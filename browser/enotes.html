@@ -1107,16 +1107,19 @@ mark.search-highlight {
         </div>
       `;
 
-      // DOM APIs instead of an inline onclick, since escapeHtml leaves quotes as they are
+      // Tag pills via DOM APIs: tags are user data (importable from JSON),
+      // so they must never flow through innerHTML or inline event handlers.
+      // (escapeHtml does not escape quotes, so the old inline onclick was
+      // breakable with a quote in the tag.)
       const tagsContainer = item.querySelector('.note-item-tags');
       note.tags.forEach(t => {
-        const c = tagColor(t);
+        const tc = tagColor(t);
         const pill = document.createElement('span');
         pill.className = 'tag-pill';
         pill.dataset.tag = t;
         pill.textContent = t;
-        pill.style.background = c.bg;
-        pill.style.color = c.fg;
+        pill.style.background = tc.bg;
+        pill.style.color = tc.fg;
         pill.addEventListener('click', e => {
           e.stopPropagation();
           window._filterByTag(t);
@@ -1334,8 +1337,12 @@ mark.search-highlight {
         if (!Array.isArray(imported)) throw new Error('Invalid format');
         imported.forEach(n => {
           if (!n.id) n.id = uuid();
+          // Trust boundary: imported JSON is untrusted. Coerce to the shapes
+          // the renderers expect, and normalize tags the same way addTag does.
           const tags = Array.isArray(n.tags) ? n.tags.filter(t => typeof t === 'string') : [];
           n.tags = [...new Set(tags.map(normalizeTag).filter(Boolean))];
+          if (typeof n.title !== 'string') n.title = '';
+          if (typeof n.content !== 'string') n.content = '';
           if (!n.created_at) n.created_at = new Date().toISOString();
           if (!n.updated_at) n.updated_at = new Date().toISOString();
           if (typeof n.pinned !== 'boolean') n.pinned = false;

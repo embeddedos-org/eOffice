@@ -195,7 +195,6 @@ const evaluateFormula = (formula: string, cells: Record<string, CellData>): numb
       const cell = cells[ref];
       return String(cell?.value ?? 0);
     });
-    // eslint-disable-next-line no-new-func
     return Function(`"use strict"; return (${sanitized})`)();
   } catch {
     return '#ERROR!';
@@ -230,7 +229,9 @@ export default function CalcPage() {
         try {
           const parsed = JSON.parse(doc.content);
           if (parsed.sheets) setSpreadsheet(prev => ({ ...prev, sheets: parsed.sheets, activeSheetId: parsed.sheets[0]?.id || 'sheet_1' }));
-        } catch {}
+        } catch {
+          // Malformed content: keep the current spreadsheet as-is.
+        }
       } else {
         navigate('/calc');
       }

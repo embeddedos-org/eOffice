@@ -1233,9 +1233,13 @@ mark.search-highlight {
     });
   }
 
+  function normalizeTag(tagName) {
+    return tagName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  }
+
   // Add tag
   function addTag(tagName) {
-    const tag = tagName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const tag = normalizeTag(tagName);
     if (!tag) return;
     const note = notes.find(n => n.id === selectedNoteId);
     if (!note || note.tags.includes(tag)) return;
@@ -1334,9 +1338,9 @@ mark.search-highlight {
         imported.forEach(n => {
           if (!n.id) n.id = uuid();
           // Trust boundary: imported JSON is untrusted. Coerce to the shapes
-          // the renderers expect so non-string values can't reach the DOM.
-          if (!Array.isArray(n.tags)) n.tags = [];
-          n.tags = n.tags.filter(t => typeof t === 'string');
+          // the renderers expect, and normalize tags the same way addTag does.
+          const tags = Array.isArray(n.tags) ? n.tags.filter(t => typeof t === 'string') : [];
+          n.tags = [...new Set(tags.map(normalizeTag).filter(Boolean))];
           if (typeof n.title !== 'string') n.title = '';
           if (typeof n.content !== 'string') n.content = '';
           if (!n.created_at) n.created_at = new Date().toISOString();

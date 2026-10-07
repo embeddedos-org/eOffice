@@ -515,3 +515,22 @@ pm2 list
 pm2 logs eoffice-api
 pm2 reload eoffice-api  # zero-downtime restart
 ```
+
+
+---
+
+## ONLYOFFICE API mirror (2026-10-07)
+
+eOffice's deployment mirrors the **ONLYOFFICE 9.3/9.4 API surface** for
+document editing integration. Pinning the mirror to the 9.3/9.4 line means
+the integration points eOffice depends on — conversion, co-editing sessions,
+and callback URLs — are validated against a known upstream API, not against
+whatever upstream latest happens to be.
+
+The mirror configuration lives with the deployment compose files (the
+DocumentServer service definition), so a fresh deploy always pulls the
+pinned version. On every **9.x minor bump**, re-mirror: pull the new
+upstream release notes, diff the API surface against the pinned copy, and
+update the pin only after the integration tests pass. Never auto-follow
+upstream latest — an unreviewed API change in the document server is a
+data-integrity risk for stored documents.

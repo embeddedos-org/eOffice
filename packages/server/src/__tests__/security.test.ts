@@ -55,6 +55,66 @@ describe('FileStore Security', () => {
   });
 });
 
+describe('FileStore Security — traversal patterns (CVE-2021-3199 class)', () => {
+  // The Oct 8 KEV batch added CVE-2021-3199 (ONLYOFFICE image-upload
+  // path traversal) — the pattern, not the component: an uploader-
+  // controlled name reaching a filesystem path unsanitized. eDrive's
+  // multer storage is safe by construction (UUID filenames), but
+  // FileStore keys reach filePath() from route params across the
+  // server, so the store's own defense is pinned here pattern by
+  // pattern, beyond the two cases above.
+  const dir = path.join(os.tmpdir(), `eoffice-trav-${Date.now()}`);
+  const store = new FileStore<{ name: string }>(dir);
+
+  it('should contain URL-encoded traversal keys', () => {
+    const key = '%2e%2e%2f%2e%2e%2fetc%2fpasswd';
+    store.set(key, { name: 'encoded' });
+    expect(store.has(key)).toBe(true);
+    expect(store.get(key)).toEqual({ name: 'encoded' });
+    // Nothing was written outside the store directory.
+    for (const f of fs.readdirSync(dir)) {
+      expect(path.resolve(dir, f).startsWith(path.resolve(dir))).toBe(true);
+      expect(f).not.toContain('%');
+    }
+  });
+
+  it('should contain absolute-path keys', () => {
+    const key = '/tmp/evil-absolute';
+    store.set(key, { name: 'abs' });
+    expect(store.has(key)).toBe(true);
+    expect(fs.existsSync('/tmp/evil-absolute.json')).toBe(false);
+  });
+
+  it('should reject keys that sanitize to empty', () => {
+    const before = fs.readdirSync(dir).length;
+    for (const key of ['..', '...', '///', '']) {
+      expect(store.has(key)).toBe(false);
+      expect(store.get(key)).toBeUndefined();
+      expect(store.delete(key)).toBe(false);
+      store.set(key, { name: 'never written' });
+    }
+    expect(fs.readdirSync(dir).length).toBe(before);
+  });
+
+  it('should keep every written filename separator-free', () => {
+    const hostile = ['../../a', '..\\\\b', 'a/b/c', 'a\\\\b', '....//x', 'x/../../y'];
+    for (const key of hostile) store.set(key, { name: key });
+    for (const f of fs.readdirSync(dir)) {
+      expect(f).toMatch(/^[A-Za-z0-9_-]+\.json$/);
+    }
+  });
+
+  it('should document that sanitized keys collide (callers use UUID ids)', () => {
+    // 'a/b' and 'a\\b' both sanitize to 'a_b': the mapping is lossy
+    // by design, which is why routes key the store by UUID, never by
+    // user-supplied names. Pinning the behaviour so a future
+    // "smarter" sanitizer changes it deliberately, not silently.
+    store.set('a/b', { name: 'first' });
+    store.set('a\\b', { name: 'second' });
+    expect(store.get('a/b')).toEqual({ name: 'second' });
+  });
+});
+
 describe('Input Validation', () => {
   it('should validate email format', async () => {
     const { validateEmail } = await import('../middleware/validate');

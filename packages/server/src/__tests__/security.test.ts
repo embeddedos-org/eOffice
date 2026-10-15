@@ -86,14 +86,37 @@ describe('FileStore Security — traversal patterns (CVE-2021-3199 class)', () =
   });
 
   it('should reject keys that sanitize to empty', () => {
+    // Only keys whose every character is consumed by sanitizeKey's
+    // '..' removal reduce to empty: '..', '' and '....' (two '..'
+    // pairs). Those are rejected by filePath() and write nothing.
+    // (Nightly 38674881733 caught the earlier version of this test
+    // lumping '...' and '///' in here: they sanitize to '_' and
+    // '___', not empty — see the containment case below.)
     const before = fs.readdirSync(dir).length;
-    for (const key of ['..', '...', '///', '']) {
+    for (const key of ['..', '', '....']) {
       expect(store.has(key)).toBe(false);
       expect(store.get(key)).toBeUndefined();
       expect(store.delete(key)).toBe(false);
       store.set(key, { name: 'never written' });
     }
     expect(fs.readdirSync(dir).length).toBe(before);
+  });
+
+  it('should contain dot/slash-only keys as inert separator-free names', () => {
+    // '...' -> '_' and '///' -> '___' under sanitizeKey: not empty,
+    // so not rejected — but the names they write are separator-free,
+    // contained in the store directory, and round-trip through the
+    // same sanitized mapping. Containment, not rejection, is the
+    // security property for this class.
+    for (const key of ['...', '///']) {
+      store.set(key, { name: 'contained' });
+      expect(store.has(key)).toBe(true);
+      expect(store.get(key)).toEqual({ name: 'contained' });
+    }
+    for (const f of fs.readdirSync(dir)) {
+      expect(f).toMatch(/^[A-Za-z0-9_-]+\.json$/);
+      expect(path.resolve(dir, f).startsWith(path.resolve(dir))).toBe(true);
+    }
   });
 
   it('should keep every written filename separator-free', () => {

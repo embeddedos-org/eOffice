@@ -1,0 +1,24 @@
+# eOffice
+
+> llms.txt for the eOffice repository (embeddedos-org/eOffice).
+> Status: the office suite for EmbeddedOS — offline-first
+> applications with CRDT-based sync and stated privacy
+> invariants, implemented in Node.js.
+
+eOffice is the productivity layer of the EmbeddedOS ecosystem.
+Its design record is explicit about its guarantees: what
+offline-first means per app, which privacy invariants hold,
+and why sync uses CRDTs rather than OT.
+
+## Docs
+
+- [eOffice Architecture](docs/architecture.md)
+- [Offline-first guarantees](docs/offline-first-guarantees.md)
+- [eOffice privacy invariants](docs/privacy-invariants.md)
+- [Sync: CRDT vs OT — decision note](docs/sync-crdt-vs-ot.md)
+- [eOffice v2.0.0 — Deployment Runbook](docs/DEPLOYMENT_RUNBOOK.md)
+
+## Machine-readable
+
+- [llms.txt](llms.txt) — this file
+- [llms-full.txt](llms-full.txt) — the docs above concatenated as one document

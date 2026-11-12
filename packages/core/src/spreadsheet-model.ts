@@ -891,8 +891,13 @@ export class SpreadsheetModel {
           condition.slice(idx + op.length).trim(),
           sheetId,
         );
-        const l = typeof left === 'number' ? left : Number(left);
-        const r = typeof right === 'number' ? right : Number(right);
+        const ln = typeof left === 'number' ? left : Number(left);
+        const rn = typeof right === 'number' ? right : Number(right);
+        // Text on either side would be NaN as a number, so compare as
+        // case-insensitive text instead, like other spreadsheets do.
+        const asText = isNaN(ln) || isNaN(rn);
+        const l = asText ? String(left).toLowerCase() : ln;
+        const r = asText ? String(right).toLowerCase() : rn;
 
         switch (op) {
           case '>':

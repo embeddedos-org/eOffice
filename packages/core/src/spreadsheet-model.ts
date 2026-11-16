@@ -476,14 +476,16 @@ export class SpreadsheetModel {
       case 'SUMIF': {
         const parts = this.splitTopLevelCommas(argsStr);
         if (parts.length < 2) return '#ERROR!';
-        const rangeValues = this.resolveRangeOrArgs(parts[0].trim(), sheetId);
+        const rangeValues = this.rangeSlots(parts[0], sheetId);
         const criteria = this.resolveValue(parts[1].trim(), sheetId);
-        const sumRange = parts.length > 2 ? this.resolveRangeOrArgs(parts[2].trim(), sheetId) : rangeValues;
+        const sumRange = parts.length > 2 ? this.rangeSlots(parts[2], sheetId) : rangeValues;
 
         let total = 0;
         for (let i = 0; i < rangeValues.length; i++) {
-          if (this.matchesCriteria(rangeValues[i], criteria)) {
-            const val = i < sumRange.length ? sumRange[i] : 0;
+          const key = rangeValues[i];
+          if (key !== null && this.matchesCriteria(key, criteria)) {
+            const val = i < sumRange.length ? sumRange[i] : null;
+            if (val === null) continue;
             total += typeof val === 'number' ? val : (isNaN(Number(val)) ? 0 : Number(val));
           }
         }
@@ -503,15 +505,17 @@ export class SpreadsheetModel {
       case 'AVERAGEIF': {
         const parts = this.splitTopLevelCommas(argsStr);
         if (parts.length < 2) return '#ERROR!';
-        const rangeValues = this.resolveRangeOrArgs(parts[0].trim(), sheetId);
+        const rangeValues = this.rangeSlots(parts[0], sheetId);
         const criteria = this.resolveValue(parts[1].trim(), sheetId);
-        const avgRange = parts.length > 2 ? this.resolveRangeOrArgs(parts[2].trim(), sheetId) : rangeValues;
+        const avgRange = parts.length > 2 ? this.rangeSlots(parts[2], sheetId) : rangeValues;
 
         let total = 0;
         let count = 0;
         for (let i = 0; i < rangeValues.length; i++) {
-          if (this.matchesCriteria(rangeValues[i], criteria)) {
-            const val = i < avgRange.length ? avgRange[i] : 0;
+          const key = rangeValues[i];
+          if (key !== null && this.matchesCriteria(key, criteria)) {
+            const val = i < avgRange.length ? avgRange[i] : null;
+            if (val === null) continue;
             const num = typeof val === 'number' ? val : Number(val);
             if (!isNaN(num)) { total += num; count++; }
           }
@@ -755,6 +759,55 @@ export class SpreadsheetModel {
       return regex.test(strValue);
     }
     return strValue.toLowerCase() === strCriteria.toLowerCase();
+  }
+
+  /**
+   * The cells of one range argument in row-major order, with a null slot
+   * for each empty cell (no cell, or a cell whose value is ''). SUMIF and AVERAGEIF pair two ranges by position,
+   * so an empty cell must keep its slot instead of being left out (as
+   * expandRange does). An argument that is not a range is resolved as a
+   * single value.
+   */
+  private rangeSlots(arg: string, sheetId: string): (string | number | null)[] {
+    const trimmed = arg.trim();
+    let targetId = sheetId;
+    let startRef: string;
+    let endRef: string;
+    const crossSheetRange = trimmed.match(/^(\w+)!([A-Z]+\d+):([A-Z]+\d+)$/i);
+    const rangeMatch = trimmed.match(/^([A-Z]+\d+):([A-Z]+\d+)$/i);
+    if (crossSheetRange) {
+      const targetSheet = this.sheets.find((s) => s.name === crossSheetRange[1]);
+      if (!targetSheet) return ['#REF!'];
+      targetId = targetSheet.id;
+      startRef = crossSheetRange[2];
+      endRef = crossSheetRange[3];
+    } else if (rangeMatch) {
+      startRef = rangeMatch[1];
+      endRef = rangeMatch[2];
+    } else {
+      return [this.resolveValue(trimmed, sheetId)];
+    }
+
+    const start = this.parseCellRef(startRef);
+    const end = this.parseCellRef(endRef);
+    const sheet = this.getSheet(targetId);
+    if (!start || !end || !sheet) return [];
+
+    const slots: (string | number | null)[] = [];
+    for (let r = start.row; r <= end.row; r++) {
+      for (let c = start.col; c <= end.col; c++) {
+        const cell = sheet.cells[this.cellKey(r, c)];
+        const v = cell ? (cell.computedValue !== undefined ? cell.computedValue : cell.value) : '';
+        if (v === '') {
+          // No cell, or one whose content was deleted or only formatted.
+          slots.push(null);
+          continue;
+        }
+        const num = Number(v);
+        slots.push(isNaN(num) ? String(v) : num);
+      }
+    }
+    return slots;
   }
 
   private splitTopLevelCommas(str: string): string[] {

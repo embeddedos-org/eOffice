@@ -829,6 +829,9 @@ export class SpreadsheetModel {
         if (cell) {
           const v =
             cell.computedValue !== undefined ? cell.computedValue : cell.value;
+          // A cell with no content (deleted, or only formatted) or a
+          // formula that returned "" is blank: Number('') would be 0.
+          if (v === '') continue;
           const num = Number(v);
           values.push(isNaN(num) ? String(v) : num);
         }

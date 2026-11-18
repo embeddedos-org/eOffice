@@ -589,8 +589,7 @@ export class SpreadsheetModel {
         const num = Number(this.resolveValue(parts[0].trim(), sheetId));
         const digits = parts.length > 1 ? Number(this.resolveValue(parts[1].trim(), sheetId)) : 0;
         if (isNaN(num)) return '#ERROR!';
-        const factor = Math.pow(10, digits);
-        return Math.round(num * factor) / factor;
+        return this.roundTo(num, digits, 'round');
       }
       case 'ROUNDUP': {
         const parts = this.splitTopLevelCommas(argsStr);
@@ -598,8 +597,7 @@ export class SpreadsheetModel {
         const num = Number(this.resolveValue(parts[0].trim(), sheetId));
         const digits = parts.length > 1 ? Number(this.resolveValue(parts[1].trim(), sheetId)) : 0;
         if (isNaN(num)) return '#ERROR!';
-        const factor = Math.pow(10, digits);
-        return Math.ceil(num * factor) / factor;
+        return this.roundTo(num, digits, 'up');
       }
       case 'ROUNDDOWN': {
         const parts = this.splitTopLevelCommas(argsStr);
@@ -607,8 +605,7 @@ export class SpreadsheetModel {
         const num = Number(this.resolveValue(parts[0].trim(), sheetId));
         const digits = parts.length > 1 ? Number(this.resolveValue(parts[1].trim(), sheetId)) : 0;
         if (isNaN(num)) return '#ERROR!';
-        const factor = Math.pow(10, digits);
-        return Math.floor(num * factor) / factor;
+        return this.roundTo(num, digits, 'down');
       }
       case 'ABS': {
         const parts = this.splitTopLevelCommas(argsStr);
@@ -733,6 +730,26 @@ export class SpreadsheetModel {
       default:
         return '#ERROR!';
     }
+  }
+
+  /**
+   * ROUND, ROUNDUP and ROUNDDOWN. The magnitude is rounded and the sign put
+   * back, so ROUND takes a half away from zero, ROUNDUP goes away from zero
+   * and ROUNDDOWN toward zero for negative numbers too. The shift by
+   * `digits` is done on the decimal exponent rather than by multiplying by
+   * 10^digits, which is inexact (0.07 * 100 is 7.000000000000001).
+   */
+  private roundTo(num: number, digits: number, mode: 'round' | 'up' | 'down'): number {
+    if (!isFinite(num) || num === 0) return num;
+    const places = Math.trunc(digits);
+    const shift = (n: number, by: number): number => {
+      const [mantissa, exponent] = String(n).split('e');
+      return Number(`${mantissa}e${Number(exponent || 0) + by}`);
+    };
+    const magnitude = shift(Math.abs(num), places);
+    const rounded =
+      mode === 'up' ? Math.ceil(magnitude) : mode === 'down' ? Math.floor(magnitude) : Math.round(magnitude);
+    return Math.sign(num) * shift(rounded, -places);
   }
 
   private matchesCriteria(value: string | number, criteria: string | number): boolean {

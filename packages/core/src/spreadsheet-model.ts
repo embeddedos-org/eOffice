@@ -649,8 +649,17 @@ export class SpreadsheetModel {
         return Math.floor(num);
       }
       case 'COUNTA': {
-        const values = this.resolveRangeOrArgs(argsStr, sheetId);
-        return values.filter((v) => v !== '' && v !== 0).length;
+        // Count what is not empty. A 0 is a value; an empty cell is not.
+        // Single-cell references go through rangeSlots too, because
+        // resolveValue reads an empty cell as 0.
+        let count = 0;
+        for (const part of this.splitTopLevelCommas(argsStr)) {
+          const arg = part.trim();
+          const single = arg.match(/^(?:\w+!)?([A-Z]+\d+)$/i);
+          const slots = this.rangeSlots(single ? `${arg}:${single[1]}` : arg, sheetId);
+          count += slots.filter((v) => v !== null && v !== '').length;
+        }
+        return count;
       }
       case 'COUNTBLANK': {
         const parts = this.splitTopLevelCommas(argsStr);

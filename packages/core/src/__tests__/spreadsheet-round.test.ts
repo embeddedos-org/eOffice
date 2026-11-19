@@ -60,3 +60,46 @@ describe('ROUND family behaviour that does not change', () => {
     expect(formula('abc', '=ROUND(A1,2)')).toBe('#ERROR!');
   });
 });
+
+describe('ROUND family at scaling boundaries', () => {
+  it.each(['ROUND', 'ROUNDUP', 'ROUNDDOWN'])('%s preserves finite values when scaling overflows', (fn) => {
+    for (const value of ['1e308', '-1e308', '1.7976931348623157e308', '-1.7976931348623157e308']) {
+      expect(formula(value, `=${fn}(A1,2)`)).toBe(Number(value));
+    }
+  });
+
+  it.each(['ROUND', 'ROUNDUP', 'ROUNDDOWN'])('%s handles very large finite digit counts', (fn) => {
+    for (const value of ['0.000001', '-1.005', '5e-324', '1e308']) {
+      expect(formula(value, `=${fn}(A1,1e30)`)).toBe(Number(value));
+    }
+  });
+
+  it.each(['ROUND', 'ROUNDUP', 'ROUNDDOWN'])('%s validates digits before returning zero', (fn) => {
+    for (const value of ['0', '-0', '1']) {
+      for (const digits of ['abc', 'Infinity', '-Infinity']) {
+        expect(formula(value, `=${fn}(A1,"${digits}")`)).toBeNaN();
+      }
+    }
+  });
+
+  it.each(['1e-320', '-1e-320', '5e-324', '-5e-324'])('rounds %s away from zero after scaling underflows', (value) => {
+    const sign = Math.sign(Number(value));
+    expect(formula(value, '=ROUNDUP(A1,-20)')).toBe(sign * 1e20);
+    expect(formula(value, '=ROUNDUP(A1,-1e30)')).toBe(sign * Infinity);
+    expect(formula(value, '=ROUND(A1,-1e30)')).toBe(sign * 0);
+    expect(formula(value, '=ROUNDDOWN(A1,-1e30)')).toBe(sign * 0);
+  });
+
+  it('preserves rounding at subnormal precision', () => {
+    expect(formula('5e-324', '=ROUND(A1,323)')).toBe(1e-323);
+    expect(formula('-5e-324', '=ROUND(A1,323)')).toBe(-1e-323);
+    expect(formula('5e-324', '=ROUNDUP(A1,324)')).toBe(5e-324);
+    expect(formula('5e-324', '=ROUNDDOWN(A1,324)')).toBe(5e-324);
+  });
+
+  it('allows a genuinely unrepresentable rounded result to overflow', () => {
+    expect(formula('1.7976931348623157e308', '=ROUNDUP(A1,-308)')).toBe(Infinity);
+    expect(formula('-1.7976931348623157e308', '=ROUND(A1,-308)')).toBe(-Infinity);
+    expect(formula('1.7976931348623157e308', '=ROUNDDOWN(A1,-308)')).toBe(1e308);
+  });
+});

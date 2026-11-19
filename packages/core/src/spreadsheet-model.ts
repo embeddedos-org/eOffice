@@ -749,15 +749,28 @@ export class SpreadsheetModel {
    * 10^digits, which is inexact (0.07 * 100 is 7.000000000000001).
    */
   private roundTo(num: number, digits: number, mode: 'round' | 'up' | 'down'): number {
+    if (!Number.isFinite(digits)) return NaN;
     if (!isFinite(num) || num === 0) return num;
     const places = Math.trunc(digits);
     const shift = (n: number, by: number): number => {
-      const [mantissa, exponent] = String(n).split('e');
-      return Number(`${mantissa}e${Number(exponent || 0) + by}`);
+      if (n === 0) return 0;
+      const [mantissa, exponent] = n.toExponential().split('e');
+      const shiftedExponent = Number(exponent) + by;
+      // Keep even very large finite digit counts out of exponent strings.
+      if (shiftedExponent > 308) return Infinity;
+      if (shiftedExponent < -324) return 0;
+      return Number(`${mantissa}e${shiftedExponent}`);
     };
     const magnitude = shift(Math.abs(num), places);
+    // Scaling overflow cannot change a value at the requested precision.
+    if (!Number.isFinite(magnitude)) return num;
+    // A nonzero value must still round away from zero after underflow.
     const rounded =
-      mode === 'up' ? Math.ceil(magnitude) : mode === 'down' ? Math.floor(magnitude) : Math.round(magnitude);
+      mode === 'up'
+        ? Math.max(1, Math.ceil(magnitude))
+        : mode === 'down'
+          ? Math.floor(magnitude)
+          : Math.round(magnitude);
     return Math.sign(num) * shift(rounded, -places);
   }
 

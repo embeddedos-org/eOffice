@@ -1165,9 +1165,9 @@ export class SpreadsheetModel {
 
     sheet.cells = {};
 
-    const lines = csv.split('\n');
-    for (let r = 0; r < lines.length; r++) {
-      const values = this.parseCSVLine(lines[r]);
+    const rows = this.parseCSV(csv);
+    for (let r = 0; r < rows.length; r++) {
+      const values = rows[r];
       for (let c = 0; c < values.length; c++) {
         const val = values[c];
         if (val !== '') {
@@ -1179,16 +1179,22 @@ export class SpreadsheetModel {
     this.recalculate();
   }
 
-  private parseCSVLine(line: string): string[] {
-    const result: string[] = [];
+  /**
+   * Split CSV text into rows of fields (RFC 4180). A quoted field may hold
+   * commas, doubled quotes and line breaks, as exportCSV writes them; a row
+   * ends at a \n or \r\n outside quotes.
+   */
+  private parseCSV(csv: string): string[][] {
+    const rows: string[][] = [];
+    let row: string[] = [];
     let current = '';
     let inQuotes = false;
 
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
+    for (let i = 0; i < csv.length; i++) {
+      const ch = csv[i];
       if (inQuotes) {
         if (ch === '"') {
-          if (i + 1 < line.length && line[i + 1] === '"') {
+          if (i + 1 < csv.length && csv[i + 1] === '"') {
             current += '"';
             i++;
           } else {
@@ -1197,19 +1203,24 @@ export class SpreadsheetModel {
         } else {
           current += ch;
         }
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        row.push(current);
+        current = '';
+      } else if (ch === '\n' || (ch === '\r' && csv[i + 1] === '\n')) {
+        if (ch === '\r') i++;
+        row.push(current);
+        rows.push(row);
+        row = [];
+        current = '';
       } else {
-        if (ch === '"') {
-          inQuotes = true;
-        } else if (ch === ',') {
-          result.push(current);
-          current = '';
-        } else {
-          current += ch;
-        }
+        current += ch;
       }
     }
-    result.push(current);
-    return result;
+    row.push(current);
+    rows.push(row);
+    return rows;
   }
 
   // ── JSON serialization ───────────────────────────────────────────

@@ -131,6 +131,24 @@ function escXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 }
 
+// The character references an editor's innerHTML can contain. innerHTML
+// writes &, <, > and non-breaking spaces as &amp;, &lt;, &gt; and &nbsp;.
+const HTML_ENTITIES = new Map<string, string>([
+  ['amp', '&'], ['lt', '<'], ['gt', '>'], ['quot', '"'], ['apos', "'"], ['nbsp', '\u00a0'],
+]);
+
+/** Turn HTML character references in text back into the characters. */
+function decodeHtmlEntities(s: string): string {
+  return s.replace(/&(#\d+|#[xX][0-9a-fA-F]+|[a-zA-Z]+);/g, (ref, body: string) => {
+    if (body[0] !== '#') return HTML_ENTITIES.get(body) ?? ref;
+    const code = body[1] === 'x' || body[1] === 'X'
+      ? parseInt(body.slice(2), 16)
+      : parseInt(body.slice(1), 10);
+    const valid = code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff);
+    return valid ? String.fromCodePoint(code) : ref;
+  });
+}
+
 function htmlToMarkdown(html: string): string {
   return html
     .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n\n')
@@ -207,7 +225,9 @@ function htmlToWordXml(html: string): string {
         if (italic) rPr += '<w:i/>';
         rPr += '</w:rPr>';
       }
-      runs.push(`<w:r>${rPr}<w:t xml:space="preserve">${escXml(part)}</w:t></w:r>`);
+      // `part` is still HTML text (&amp;, &lt;, &nbsp;); decode it so that
+      // escXml writes each character once instead of escaping the entity.
+      runs.push(`<w:r>${rPr}<w:t xml:space="preserve">${escXml(decodeHtmlEntities(part))}</w:t></w:r>`);
     }
 
     if (runs.length > 0) {

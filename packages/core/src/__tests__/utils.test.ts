@@ -93,6 +93,17 @@ describe('truncateText', () => {
   it('handles empty string', () => {
     expect(truncateText('', 10)).toBe('');
   });
+
+  it('never returns more than maxLen characters, even below the ellipsis length', () => {
+    expect(truncateText('Hello', 3)).toBe('...');
+    expect(truncateText('Hello', 2)).toBe('He');
+    expect(truncateText('Hello', 1)).toBe('H');
+    expect(truncateText('Hello', 0)).toBe('');
+    expect(truncateText('Hello', -1)).toBe('');
+    for (let n = -1; n <= 6; n++) {
+      expect(truncateText('Hello', n).length).toBeLessThanOrEqual(Math.max(n, 0));
+    }
+  });
 });
 
 describe('escapeJson', () => {

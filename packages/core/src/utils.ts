@@ -25,6 +25,8 @@ export function formatDate(date: Date): string {
 
 export function truncateText(text: string, maxLen: number): string {
   if (text.length <= maxLen) return text;
+  // No room for the ellipsis: slice(0, maxLen - 3) would count from the end.
+  if (maxLen < 3) return text.slice(0, Math.max(maxLen, 0));
   return text.slice(0, maxLen - 3) + '...';
 }
 

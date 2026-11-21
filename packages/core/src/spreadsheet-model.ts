@@ -636,7 +636,10 @@ export class SpreadsheetModel {
         const num = Number(this.resolveValue(parts[0].trim(), sheetId));
         const divisor = Number(this.resolveValue(parts[1].trim(), sheetId));
         if (isNaN(num) || isNaN(divisor) || divisor === 0) return '#ERROR!';
-        return num % divisor;
+        // A spreadsheet MOD takes the sign of the divisor (MOD(-3, 2) is 1);
+        // JavaScript's % takes the sign of the dividend (-3 % 2 is -1).
+        const rem = num % divisor;
+        return rem !== 0 && (rem < 0) !== (divisor < 0) ? rem + divisor : rem;
       }
       case 'INT': {
         const parts = this.splitTopLevelCommas(argsStr);

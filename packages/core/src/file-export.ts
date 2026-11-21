@@ -60,11 +60,15 @@ export function exportToCsv(title: string, data: string[][]): void {
   download(`${title}.csv`, csv, 'text/csv');
 }
 
+// A plain decimal number, as SpreadsheetML Number cells expect. Number() alone
+// also accepts blank text (as 0), hex/binary/octal literals and "Infinity".
+const DECIMAL_NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+
 export function exportToXlsx(title: string, data: string[][]): void {
   // Minimal XLSX: XML Spreadsheet 2003 format (widely supported)
   const rows = data.map((row) =>
     `<Row>${row.map((cell) => {
-      const isNum = cell !== '' && !isNaN(Number(cell));
+      const isNum = DECIMAL_NUMBER.test(cell.trim());
       return `<Cell><Data ss:Type="${isNum ? 'Number' : 'String'}">${escXml(cell)}</Data></Cell>`;
     }).join('')}</Row>`
   ).join('\n');

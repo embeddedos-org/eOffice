@@ -894,7 +894,11 @@ export class SpreadsheetModel {
     const values: (string | number)[] = [];
 
     for (const part of parts) {
-      const trimmed = part.trim();
+      // Read a single cell (A1, Sheet2!A1) as the one-cell range A1:A1, so a
+      // blank cell is left out as it is in a longer range. resolveValue would
+      // turn it into 0, which COUNT, AVERAGE, MIN and MAX then counted.
+      const single = part.trim().match(/^(?:\w+!)?([A-Z]+\d+)$/i);
+      const trimmed = single ? `${part.trim()}:${single[1]}` : part.trim();
 
       const crossSheetRange = trimmed.match(/^(\w+)!([A-Z]+\d+):([A-Z]+\d+)$/i);
       if (crossSheetRange) {

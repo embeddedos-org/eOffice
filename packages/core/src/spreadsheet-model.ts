@@ -365,7 +365,8 @@ export class SpreadsheetModel {
         const searchVal = this.resolveValue(parts[0].trim(), sheetId);
         const rangeMatch = parts[1].trim().match(/^([A-Z]+\d+):([A-Z]+\d+)$/i);
         if (!rangeMatch) return '#ERROR!';
-        const colIndex = Number(this.resolveValue(parts[2].trim(), sheetId));
+        const colIndex = this.lookupIndex(this.resolveValue(parts[2].trim(), sheetId));
+        if (colIndex === null) return '#VALUE!';
         const exactMatch = parts.length > 3 ? this.resolveValue(parts[3].trim(), sheetId) === 0 : true;
 
         const start = this.parseCellRef(rangeMatch[1]);
@@ -398,7 +399,8 @@ export class SpreadsheetModel {
         const searchVal = this.resolveValue(parts[0].trim(), sheetId);
         const rangeMatch = parts[1].trim().match(/^([A-Z]+\d+):([A-Z]+\d+)$/i);
         if (!rangeMatch) return '#ERROR!';
-        const rowIndex = Number(this.resolveValue(parts[2].trim(), sheetId));
+        const rowIndex = this.lookupIndex(this.resolveValue(parts[2].trim(), sheetId));
+        if (rowIndex === null) return '#VALUE!';
 
         const start = this.parseCellRef(rangeMatch[1]);
         const end = this.parseCellRef(rangeMatch[2]);
@@ -427,8 +429,9 @@ export class SpreadsheetModel {
         if (parts.length < 3) return '#ERROR!';
         const rangeMatch = parts[0].trim().match(/^([A-Z]+\d+):([A-Z]+\d+)$/i);
         if (!rangeMatch) return '#ERROR!';
-        const rowIdx = Number(this.resolveValue(parts[1].trim(), sheetId));
-        const colIdx = Number(this.resolveValue(parts[2].trim(), sheetId));
+        const rowIdx = this.lookupIndex(this.resolveValue(parts[1].trim(), sheetId));
+        const colIdx = this.lookupIndex(this.resolveValue(parts[2].trim(), sheetId));
+        if (rowIdx === null || colIdx === null) return '#VALUE!';
 
         const start = this.parseCellRef(rangeMatch[1]);
         const end = this.parseCellRef(rangeMatch[2]);
@@ -775,6 +778,19 @@ export class SpreadsheetModel {
           ? Math.floor(magnitude)
           : Math.round(magnitude);
     return Math.sign(num) * shift(rounded, -places);
+  }
+
+  /**
+   * A 1-based row/column index for VLOOKUP, HLOOKUP and INDEX, truncated like
+   * spreadsheets do (2.9 -> 2). Returns null for a value that is not a number
+   * or is below 1, so the caller reports #VALUE! instead of reading a cell
+   * outside the range.
+   */
+  private lookupIndex(value: string | number): number | null {
+    const n = typeof value === 'number' ? value : value.trim() === '' ? NaN : Number(value);
+    if (!Number.isFinite(n)) return null;
+    const idx = Math.trunc(n);
+    return idx >= 1 ? idx : null;
   }
 
   private matchesCriteria(value: string | number, criteria: string | number): boolean {

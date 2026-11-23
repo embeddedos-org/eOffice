@@ -29,10 +29,13 @@ export class DriveModel {
   moveFile(id: string, newParentId: string): boolean {
     const file = this.files.find((f) => f.id === id);
     if (!file) return false;
+    // A folder cannot move into itself or into one of its own subfolders.
+    if (this.isSameOrDescendant(newParentId, id)) return false;
     const parent = this.files.find((f) => f.id === newParentId);
     file.parentId = newParentId;
     file.path = parent ? `${parent.path}/${file.name}` : `/${file.name}`;
     file.updated_at = new Date();
+    this.updateChildPaths(file);
     return true;
   }
 
@@ -43,7 +46,30 @@ export class DriveModel {
     file.name = newName;
     file.path = `${dir}/${newName}`;
     file.updated_at = new Date();
+    this.updateChildPaths(file);
     return true;
+  }
+
+  /** Rebuild the paths of everything under a folder after its own path changed. */
+  private updateChildPaths(folder: DriveFile, seen: Set<string> = new Set([folder.id])): void {
+    for (const child of this.files) {
+      if (child.parentId !== folder.id || seen.has(child.id)) continue;
+      seen.add(child.id);
+      child.path = `${folder.path}/${child.name}`;
+      this.updateChildPaths(child, seen);
+    }
+  }
+
+  /** True when `id` is `ancestorId` itself or lies somewhere under it. */
+  private isSameOrDescendant(id: string, ancestorId: string): boolean {
+    const seen = new Set<string>();
+    let current: string | undefined = id;
+    while (current !== undefined && !seen.has(current)) {
+      if (current === ancestorId) return true;
+      seen.add(current);
+      current = this.getFile(current)?.parentId;
+    }
+    return false;
   }
 
   getChildren(parentId?: string): DriveFile[] {

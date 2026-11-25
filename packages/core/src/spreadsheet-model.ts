@@ -294,14 +294,16 @@ export class SpreadsheetModel {
 
   private evalExpression(expr: string, sheetId: string): string | number {
     const funcMatch = expr.match(/^([A-Z]+)\((.+)\)$/i);
-    if (funcMatch) {
+    // Only a single call if the "(" after the name closes at the very end;
+    // =SUM(A1:A2)+SUM(B1:B2) also starts with a name and ends with ")".
+    if (funcMatch && this.closingParenIndex(expr, funcMatch[1].length) === expr.length - 1) {
       const funcName = funcMatch[1].toUpperCase();
       const argsStr = funcMatch[2];
       return this.evalFunction(funcName, argsStr, sheetId);
     }
 
     const ifMatch = expr.match(/^IF\((.+)\)$/i);
-    if (ifMatch) {
+    if (ifMatch && this.closingParenIndex(expr, 2) === expr.length - 1) {
       return this.evalFunction('IF', ifMatch[1], sheetId);
     }
 
@@ -1048,11 +1050,31 @@ export class SpreadsheetModel {
     const num = Number(trimmed);
     if (!isNaN(num) && trimmed.length > 0) return num;
 
+    // A whole function call used as an operand, e.g. SUM(A1:A2) in SUM(A1:A2)*2.
+    // Same test as the single-call branch in evalExpression, and evalFunction
+    // is called directly, so this never hands the text back to evalExpression.
+    // Anything that test rejects (NOW(), a line break inside the parentheses)
+    // is left to the code below, as before.
+    const call = trimmed.match(/^([A-Z]+)\((.+)\)$/i);
+    if (call && this.closingParenIndex(trimmed, call[1].length) === trimmed.length - 1) {
+      return this.evalFunction(call[1].toUpperCase(), call[2], sheetId);
+    }
+
     // Addition/subtraction (lowest precedence — split here first)
     // Find the rightmost + or - that isn't inside a leading position
+    // or inside a function call's parentheses or a quoted string
+    let depth = 0;
+    let quote = '';
     for (let i = trimmed.length - 1; i > 0; i--) {
       const ch = trimmed[i];
-      if (ch === '+' || ch === '-') {
+      if (quote) {
+        if (ch === quote) quote = '';
+        continue;
+      }
+      if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === ')') depth++;
+      else if (ch === '(') depth--;
+      if (depth === 0 && (ch === '+' || ch === '-')) {
         const left = trimmed.slice(0, i);
         const right = trimmed.slice(i + 1);
         if (left.trim() && right.trim()) {
@@ -1067,9 +1089,18 @@ export class SpreadsheetModel {
     }
 
     // Multiplication/division (higher precedence)
+    depth = 0;
+    quote = '';
     for (let i = trimmed.length - 1; i > 0; i--) {
       const ch = trimmed[i];
-      if (ch === '*' || ch === '/') {
+      if (quote) {
+        if (ch === quote) quote = '';
+        continue;
+      }
+      if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === ')') depth++;
+      else if (ch === '(') depth--;
+      if (depth === 0 && (ch === '*' || ch === '/')) {
         const left = trimmed.slice(0, i);
         const right = trimmed.slice(i + 1);
         if (left.trim() && right.trim()) {
@@ -1088,6 +1119,29 @@ export class SpreadsheetModel {
   }
 
   // ── Helper methods ────────────────────────────────────────────────
+
+  /**
+   * Index of the ")" that closes the "(" at openIndex, or -1.
+   * Parentheses inside "..." or '...' strings are not counted.
+   */
+  private closingParenIndex(expr: string, openIndex: number): number {
+    let depth = 0;
+    let quote = '';
+    for (let i = openIndex; i < expr.length; i++) {
+      const ch = expr[i];
+      if (quote) {
+        if (ch === quote) quote = '';
+      } else if (ch === '"' || ch === "'") {
+        quote = ch;
+      } else if (ch === '(') {
+        depth++;
+      } else if (ch === ')') {
+        depth--;
+        if (depth === 0) return i;
+      }
+    }
+    return -1;
+  }
 
   private cellKey(row: number, col: number): string {
     return `${row}:${col}`;

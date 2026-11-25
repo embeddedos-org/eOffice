@@ -1,6 +1,21 @@
 import type { Cell, Sheet, CellFormat } from './types';
 import { generateId } from './utils';
 
+/** A range argument resolved to the block of cells it covers. */
+interface ResolvedRange {
+  kind: 'range';
+  sheet: Sheet;
+  start: { row: number; col: number };
+  end: { row: number; col: number };
+}
+
+/** How a range argument resolves. See rangeTarget. */
+type RangeTarget =
+  | ResolvedRange
+  | { kind: 'ref-error' }
+  | { kind: 'empty' }
+  | { kind: 'value' };
+
 export class SpreadsheetModel {
   public sheets: Sheet[];
   public activeSheetId: string;
@@ -657,12 +672,19 @@ export class SpreadsheetModel {
         // Count what is not empty. A 0 is a value; an empty cell is not.
         // Single-cell references go through rangeSlots too, because
         // resolveValue reads an empty cell as 0.
+        // A cell holding a formula counts even when the formula returns '',
+        // which rangeSlots reports as an empty slot: a formula cell is not
+        // the same as a missing, deleted or formatted-only cell.
         let count = 0;
         for (const part of this.splitTopLevelCommas(argsStr)) {
           const arg = part.trim();
           const single = arg.match(/^(?:\w+!)?([A-Z]+\d+)$/i);
-          const slots = this.rangeSlots(single ? `${arg}:${single[1]}` : arg, sheetId);
-          count += slots.filter((v) => v !== null && v !== '').length;
+          const rangeArg = single ? `${arg}:${single[1]}` : arg;
+          const slots = this.rangeSlots(rangeArg, sheetId);
+          const isFormula = this.rangeFormulaSlots(rangeArg, sheetId);
+          count += slots.filter(
+            (v, i) => (v !== null && v !== '') || isFormula[i],
+          ).length;
         }
         return count;
       }
@@ -829,6 +851,46 @@ export class SpreadsheetModel {
    * single value.
    */
   private rangeSlots(arg: string, sheetId: string): (string | number | null)[] {
+    const target = this.rangeTarget(arg, sheetId);
+    if (target.kind === 'value') return [this.resolveValue(arg.trim(), sheetId)];
+    if (target.kind === 'ref-error') return ['#REF!'];
+    if (target.kind === 'empty') return [];
+
+    const slots: (string | number | null)[] = [];
+    for (const cell of this.rangeCells(target)) {
+      const v = cell ? (cell.computedValue !== undefined ? cell.computedValue : cell.value) : '';
+      if (v === '') {
+        // No cell, or one whose content was deleted or only formatted.
+        slots.push(null);
+        continue;
+      }
+      const num = Number(v);
+      slots.push(isNaN(num) ? String(v) : num);
+    }
+    return slots;
+  }
+
+  /**
+   * Positionally aligned with rangeSlots: true where that slot is a cell
+   * holding a formula. A formula cell is content even when the formula
+   * evaluates to '', which rangeSlots cannot express — it reports '' as an
+   * empty slot, the same as a missing, deleted or formatted-only cell.
+   * COUNTA needs the two apart, so it reads this alongside rangeSlots.
+   */
+  private rangeFormulaSlots(arg: string, sheetId: string): boolean[] {
+    const target = this.rangeTarget(arg, sheetId);
+    // Same lengths rangeSlots returns for these: one slot, and none.
+    if (target.kind === 'value' || target.kind === 'ref-error') return [false];
+    if (target.kind === 'empty') return [];
+    return this.rangeCells(target).map((cell) => Boolean(cell?.formula));
+  }
+
+  /**
+   * How a range argument resolves: the block of cells it covers, a '#REF!'
+   * for an unknown sheet name, 'empty' for a range whose refs do not parse,
+   * or 'value' when the argument is not a range at all.
+   */
+  private rangeTarget(arg: string, sheetId: string): RangeTarget {
     const trimmed = arg.trim();
     let targetId = sheetId;
     let startRef: string;
@@ -837,7 +899,7 @@ export class SpreadsheetModel {
     const rangeMatch = trimmed.match(/^([A-Z]+\d+):([A-Z]+\d+)$/i);
     if (crossSheetRange) {
       const targetSheet = this.sheets.find((s) => s.name === crossSheetRange[1]);
-      if (!targetSheet) return ['#REF!'];
+      if (!targetSheet) return { kind: 'ref-error' };
       targetId = targetSheet.id;
       startRef = crossSheetRange[2];
       endRef = crossSheetRange[3];
@@ -845,29 +907,25 @@ export class SpreadsheetModel {
       startRef = rangeMatch[1];
       endRef = rangeMatch[2];
     } else {
-      return [this.resolveValue(trimmed, sheetId)];
+      return { kind: 'value' };
     }
 
     const start = this.parseCellRef(startRef);
     const end = this.parseCellRef(endRef);
     const sheet = this.getSheet(targetId);
-    if (!start || !end || !sheet) return [];
+    if (!start || !end || !sheet) return { kind: 'empty' };
+    return { kind: 'range', sheet, start, end };
+  }
 
-    const slots: (string | number | null)[] = [];
-    for (let r = start.row; r <= end.row; r++) {
-      for (let c = start.col; c <= end.col; c++) {
-        const cell = sheet.cells[this.cellKey(r, c)];
-        const v = cell ? (cell.computedValue !== undefined ? cell.computedValue : cell.value) : '';
-        if (v === '') {
-          // No cell, or one whose content was deleted or only formatted.
-          slots.push(null);
-          continue;
-        }
-        const num = Number(v);
-        slots.push(isNaN(num) ? String(v) : num);
+  /** The cells a resolved range covers, row-major, undefined where unset. */
+  private rangeCells(target: ResolvedRange): (Cell | undefined)[] {
+    const cells: (Cell | undefined)[] = [];
+    for (let r = target.start.row; r <= target.end.row; r++) {
+      for (let c = target.start.col; c <= target.end.col; c++) {
+        cells.push(target.sheet.cells[this.cellKey(r, c)]);
       }
     }
-    return slots;
+    return cells;
   }
 
   private splitTopLevelCommas(str: string): string[] {
@@ -1058,6 +1116,18 @@ export class SpreadsheetModel {
     const call = trimmed.match(/^([A-Z]+)\((.+)\)$/i);
     if (call && this.closingParenIndex(trimmed, call[1].length) === trimmed.length - 1) {
       return this.evalFunction(call[1].toUpperCase(), call[2], sheetId);
+    }
+
+    // A grouping parenthesis around the whole operand, e.g. (3+4) in 2*(3+4).
+    // The operator scans below only split at depth 0, so a group always
+    // arrives here whole; evaluating its inside is what gives "(" its
+    // precedence. Checked after the call branch so SUM(...) is still a call,
+    // and only when "(" closes at the very end, so (1+2)*(3+4) is left to the
+    // scans below instead of being read as one group.
+    if (trimmed.startsWith('(') && this.closingParenIndex(trimmed, 0) === trimmed.length - 1) {
+      const inner = trimmed.slice(1, -1);
+      // "()" has nothing to evaluate; fall through and treat it as text.
+      if (inner.trim()) return this.evalSimpleExpression(inner, sheetId);
     }
 
     // Addition/subtraction (lowest precedence — split here first)
@@ -1323,11 +1393,23 @@ export class SpreadsheetModel {
     model.sheets = json.sheets.map((s) => ({
       id: s.id,
       name: s.name,
-      cells: { ...s.cells },
+      // Copy each cell, not just the map: recalculate() below writes
+      // computedValue, which must not reach back into the caller's JSON.
+      cells: Object.fromEntries(
+        Object.entries(s.cells ?? {}).map(([key, cell]) => [key, { ...cell }]),
+      ),
       columnWidths: s.columnWidths ? { ...s.columnWidths } : {},
       rowHeights: s.rowHeights ? { ...s.rowHeights } : {},
     }));
     model.activeSheetId = json.activeSheetId;
+    // A saved computedValue is a cache of what the formula meant when it was
+    // written. Trusting it shows the reader a stale number whenever an input
+    // or the evaluator has changed since the save, with nothing on screen to
+    // say so, and the stale value also flows into CSV and XLS exports.
+    // Recomputing on load is what a spreadsheet is expected to do. Cost: one
+    // recalculate() per load, the same pass every setCell already runs, and
+    // it returns immediately when the workbook holds no formulas.
+    model.recalculate();
     return model;
   }
 }

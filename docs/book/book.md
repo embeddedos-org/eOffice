@@ -715,6 +715,24 @@ organizational features.
 | Search Files        | Natural-language file search across all files  |
 | Summarize Documents | Generate summaries of uploaded documents       |
 
+### Folder Moves and Renames
+
+A file's `path` is always derived from where it sits in the tree: a file at the
+root is `/name`, and a file inside a folder is `<folder path>/<name>`.
+
+- **Renaming or moving a folder rewrites the paths of everything inside it**,
+  to any depth. Renaming `/docs` to `/papers` leaves `/papers/notes.txt` and
+  `/papers/2026/report.txt`, and each descendant's modification time is
+  updated along with its path.
+- **A folder cannot be moved into itself or into one of its own subfolders.**
+  Such a move is rejected and the tree is left untouched, rather than
+  detaching the folder and its contents from the root.
+- **Loading a saved drive re-derives every path from the tree.** Drives saved
+  by an older version can contain paths left stale by a folder rename or move;
+  they are normalised on load instead of staying wrong until that folder is
+  touched again. A file whose parent no longer exists is treated as a root
+  file.
+
 ---
 
 ## 3.8 eConnect — Team Messaging

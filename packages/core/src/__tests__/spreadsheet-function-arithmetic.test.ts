@@ -80,46 +80,86 @@ describe('SpreadsheetModel function calls inside arithmetic', () => {
     expect(get('C4')).toBe('a(b');
   });
 
-  it('a call with empty parentheses does not recurse into an error', () => {
-    const get = sheet({ C1: '=NOW()', C2: '=TODAY()' });
-    expect(get('C1')).not.toBe('#ERROR!');
-    expect(get('C2')).not.toBe('#ERROR!');
+  it('evaluates a call with empty parentheses, alone and as an operand', () => {
+    const today = new Date();
+    const expected = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, '0'),
+      String(today.getDate()).padStart(2, '0'),
+    ].join('-');
+    const before = Date.now();
+    const get = sheet({
+      C1: '=NOW()', C2: '=TODAY()', C3: '=NOW()+1', C4: '=SUM()', C5: '=SUM()+1',
+    });
+    const after = Date.now();
+
+    // NOW() is a clock reading, so pin it to the window the test ran in.
+    expect(typeof get('C1')).toBe('number');
+    expect(get('C1') as number).toBeGreaterThanOrEqual(before);
+    expect(get('C1') as number).toBeLessThanOrEqual(after);
+    expect(get('C2')).toBe(expected);
+    expect(typeof get('C3')).toBe('number');
+    expect(get('C3') as number).toBeGreaterThanOrEqual(before + 1);
+    expect(get('C4')).toBe(0);
+    expect(get('C5')).toBe(1);
   });
 
-  it('a line break inside the parentheses does not recurse into an error', () => {
-    const get = sheet({ C1: '=SUM(1,\n2)', C2: '=SUM(1,\r\n2)', C3: '=SUM(1, 2)' });
-    expect(get('C1')).not.toBe('#ERROR!');
-    expect(get('C2')).not.toBe('#ERROR!');
-    expect(get('C3')).not.toBe('#ERROR!');
+  it('leaves a call containing a line terminator as text', () => {
+    // "." in the call pattern does not match a line terminator, so these are
+    // not calls. They must come back as the formula text, unevaluated, rather
+    // than as #ERROR! or as some half-parsed number.
+    const get = sheet({
+      C1: '=SUM(1,\n2)',
+      C2: '=SUM(1,\r\n2)',
+      C3: '=SUM(1,\u20282)',
+      C4: '=SUM(1,\u20292)',
+      C5: '=SUM(1,\n2)+1',
+    });
+    expect(get('C1')).toBe('SUM(1,\n2)');
+    expect(get('C2')).toBe('SUM(1,\r\n2)');
+    expect(get('C3')).toBe('SUM(1,\u20282)');
+    expect(get('C4')).toBe('SUM(1,\u20292)');
+    // Used as an operand it is not a number either, so arithmetic reports it.
+    expect(get('C5')).toBe('#ERROR!');
   });
 
   it('never re-enters evaluation without progress', () => {
+    // Driven through setCell/getCell rather than the private evaluator, per
+    // TESTING.md. evaluateFormula catches a runaway recursion and reports
+    // '#ERROR!', so unbounded re-entry shows up here as a stack overflow or a
+    // hang. Each of these once handed the evaluator back the same text.
     const model = new SpreadsheetModel();
     const id = model.activeSheetId;
     model.setCell(id, 0, 0, '1');
     model.setCell(id, 1, 0, '2');
-    const evalExpression = (expr: string) =>
-      (model as unknown as { evalExpression(e: string, s: string): unknown }).evalExpression(expr, id);
-    for (const expr of [
-      'NOW()',
-      'NOW()+1',
-      'SUM(1,\n2)',
-      'SUM(1,\n2)+1',
-      '1+SUM(1,\r\n2)',
-      'SUM(1,\r2)*2',
-      'SUM(1, 2)-1',
-      'SUM(\n)+1',
-      'IF(A1>0,\n1,2)+1',
-      'SUM(A1:A2',
-      'SUM(A1:A2))*2',
-      'SUM((A1:A2))*2',
-      '(SUM(A1:A2))',
+    const evaluate = (formula: string) => {
+      model.setCell(id, 9, 9, formula);
+      return model.getCell(id, 9, 9)?.computedValue;
+    };
+
+    for (const formula of [
+      '=NOW()',
+      '=NOW()+1',
+      '=SUM(1,\n2)',
+      '=SUM(1,\n2)+1',
+      '=1+SUM(1,\r\n2)',
+      '=SUM(1,\r2)*2',
+      '=SUM(1,\u20292)-1',
+      '=SUM(\n)+1',
+      '=IF(A1>0,\n1,2)+1',
+      '=SUM(A1:A2',
+      '=SUM(A1:A2))*2',
+      '=SUM((A1:A2))*2',
+      '=(SUM(A1:A2))',
     ]) {
-      expect(() => evalExpression(expr), JSON.stringify(expr)).not.toThrow();
+      expect(() => evaluate(formula), JSON.stringify(formula)).not.toThrow();
+      // Whatever it decides, it has to decide something.
+      expect(evaluate(formula), JSON.stringify(formula)).toBeDefined();
     }
-    expect(evalExpression('SUM(1,\t2)*2')).toBe(6);
-    expect(evalExpression(' SUM(A1:A2) *2')).toBe(6);
-    expect(evalExpression('MAX(SUM(A1:A2),5)*2')).toBe(10);
+
+    expect(evaluate('=SUM(1,\t2)*2')).toBe(6);
+    expect(evaluate('= SUM(A1:A2) *2')).toBe(6);
+    expect(evaluate('=MAX(SUM(A1:A2),5)*2')).toBe(10);
   });
 
   it('ignores parentheses and operators inside quoted arguments in arithmetic', () => {

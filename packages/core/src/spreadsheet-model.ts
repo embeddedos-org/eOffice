@@ -293,7 +293,8 @@ export class SpreadsheetModel {
   }
 
   private evalExpression(expr: string, sheetId: string): string | number {
-    const funcMatch = expr.match(/^([A-Z]+)\((.+)\)$/i);
+    // (.*) not (.+): a zero-argument call such as NOW() is still a call.
+    const funcMatch = expr.match(/^([A-Z]+)\((.*)\)$/i);
     // Only a single call if the "(" after the name closes at the very end;
     // =SUM(A1:A2)+SUM(B1:B2) also starts with a name and ends with ")".
     if (funcMatch && this.closingParenIndex(expr, funcMatch[1].length) === expr.length - 1) {
@@ -1055,12 +1056,13 @@ export class SpreadsheetModel {
     const num = Number(trimmed);
     if (!isNaN(num) && trimmed.length > 0) return num;
 
-    // A whole function call used as an operand, e.g. SUM(A1:A2) in SUM(A1:A2)*2.
-    // Same test as the single-call branch in evalExpression, and evalFunction
-    // is called directly, so this never hands the text back to evalExpression.
-    // Anything that test rejects (NOW(), a line break inside the parentheses)
-    // is left to the code below, as before.
-    const call = trimmed.match(/^([A-Z]+)\((.+)\)$/i);
+    // A whole function call used as an operand, e.g. SUM(A1:A2) in SUM(A1:A2)*2
+    // or NOW() in NOW()+1. Same test as the single-call branch in
+    // evalExpression, and evalFunction is called directly, so this never hands
+    // the text back to evalExpression. Anything that test rejects (a line
+    // terminator inside the parentheses, which "." does not match) is left to
+    // the code below, as before.
+    const call = trimmed.match(/^([A-Z]+)\((.*)\)$/i);
     if (call && this.closingParenIndex(trimmed, call[1].length) === trimmed.length - 1) {
       return this.evalFunction(call[1].toUpperCase(), call[2], sheetId);
     }

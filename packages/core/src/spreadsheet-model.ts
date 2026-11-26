@@ -718,7 +718,12 @@ export class SpreadsheetModel {
         const parts = this.splitTopLevelCommas(argsStr);
         if (parts.length < 2) return '#ERROR!';
         const val = this.resolveValue(parts[0].trim(), sheetId);
-        if (String(val).startsWith('#')) {
+        // Only the error values this model writes count as errors. Text
+        // that merely starts with "#" ("#1 pick", "#hashtag") is a value.
+        const isError =
+          typeof val === 'string' &&
+          /^#(?:ERROR!|REF!|N\/A|VALUE!|DIV\/0!|CIRCULAR!)$/.test(val);
+        if (isError) {
           return this.resolveValue(parts[1].trim(), sheetId);
         }
         return val;

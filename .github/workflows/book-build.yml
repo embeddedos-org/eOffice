@@ -133,6 +133,11 @@ jobs:
         run: |
           cd docs/book
 
+          # Note: -V values are injected into LaTeX as-is, so any LaTeX special
+          # character in one has to be escaped here. The author's "\&" is an
+          # alignment tab if written bare, which aborts the build with
+          # "Misplaced alignment tab character &".
+
           # Cover image
           COVER_ARGS=""
           if [ -f cover.png ]; then
@@ -163,7 +168,7 @@ jobs:
             -V page-background-color="ffffff" \
             -V "title=${{ steps.meta.outputs.title }}" \
             -V "subtitle=Version ${{ steps.meta.outputs.version }}" \
-            -V "author=Srikanth Patchava & EmbeddedOS Contributors" \
+            -V "author=Srikanth Patchava \& EmbeddedOS Contributors" \
             -V "date=$(date +'%B %Y')" \
             -V toc=true \
             -V toc-depth=3 \

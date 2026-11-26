@@ -584,7 +584,17 @@ export class SpreadsheetModel {
         const y = Number(this.resolveValue(parts[0].trim(), sheetId));
         const m = Number(this.resolveValue(parts[1].trim(), sheetId));
         const d = Number(this.resolveValue(parts[2].trim(), sheetId));
-        return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return '#VALUE!';
+        // A month or day outside its range carries into the next field, so
+        // DATE(2024,13,1) is 2025-01-01 and DATE(2024,2,30) is 2024-03-01.
+        // setUTCFullYear keeps years 0-99 as given (Date.UTC maps them to 19xx).
+        const date = new Date(0);
+        date.setUTCFullYear(Math.trunc(y), Math.trunc(m) - 1, Math.trunc(d));
+        // Past the range a JavaScript Date can hold (about 275760 years).
+        if (Number.isNaN(date.getTime())) return '#VALUE!';
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        return `${date.getUTCFullYear()}-${month}-${day}`;
       }
       case 'ROUND': {
         const parts = this.splitTopLevelCommas(argsStr);

@@ -155,11 +155,24 @@ presentationsRouter.put('/:id/slides/reorder', (req: Request, res: Response) => 
   }
   const { order } = req.body;
   if (!Array.isArray(order)) { res.status(400).json({ error: 'order array is required' }); return; }
+  // `order` must be a permutation of the current slides: every existing slide id
+  // exactly once. Anything else would duplicate a slide or drop one for good.
   const slideMap = new Map(pres.slides.map((s) => [s.id, s]));
-  pres.slides = order
-    .filter((id: unknown) => typeof id === 'string')
-    .map((id: string) => slideMap.get(id))
-    .filter((s): s is SlideRecord => s !== undefined);
+  if (order.length !== pres.slides.length) {
+    res.status(400).json({ error: 'order must list every slide id exactly once' });
+    return;
+  }
+  const reordered: SlideRecord[] = [];
+  for (const id of order) {
+    const slide = typeof id === 'string' ? slideMap.get(id) : undefined;
+    if (!slide) {
+      res.status(400).json({ error: 'order must list every slide id exactly once' });
+      return;
+    }
+    slideMap.delete(id);
+    reordered.push(slide);
+  }
+  pres.slides = reordered;
   pres.updated_at = new Date();
   store.set(pres.id, pres);
   res.json(pres);

@@ -50,13 +50,71 @@ export class DriveModel {
     return true;
   }
 
-  /** Rebuild the paths of everything under a folder after its own path changed. */
-  private updateChildPaths(folder: DriveFile, seen: Set<string> = new Set([folder.id])): void {
-    for (const child of this.files) {
-      if (child.parentId !== folder.id || seen.has(child.id)) continue;
-      seen.add(child.id);
-      child.path = `${folder.path}/${child.name}`;
-      this.updateChildPaths(child, seen);
+  /** Index the files by `parentId` so a subtree walk does not rescan `files`. */
+  private childrenByParent(): Map<string, DriveFile[]> {
+    const byParent = new Map<string, DriveFile[]>();
+    for (const file of this.files) {
+      if (file.parentId === undefined) continue;
+      const siblings = byParent.get(file.parentId);
+      if (siblings) siblings.push(file);
+      else byParent.set(file.parentId, [file]);
+    }
+    return byParent;
+  }
+
+  /**
+   * Rebuild the paths of everything under a folder after its own path changed.
+   *
+   * Iterative, so a deep tree cannot blow the call stack and leave half the
+   * descendants on their old paths, and indexed, so the whole subtree costs one
+   * pass over `files` rather than one pass per descendant.
+   */
+  private updateChildPaths(folder: DriveFile): void {
+    const byParent = this.childrenByParent();
+    const now = new Date();
+    const seen = new Set<string>([folder.id]);
+    const queue: DriveFile[] = [folder];
+    while (queue.length > 0) {
+      const parent = queue.pop() as DriveFile;
+      for (const child of byParent.get(parent.id) ?? []) {
+        // `seen` also stops a parentId cycle in stored data from looping here.
+        if (seen.has(child.id)) continue;
+        seen.add(child.id);
+        child.path = `${parent.path}/${child.name}`;
+        child.updated_at = now;
+        queue.push(child);
+      }
+    }
+  }
+
+  /**
+   * Recompute every path from the tree itself: a root file is `/name`, a child
+   * is `<parent path>/<name>`, exactly as `addFile()` builds them.
+   *
+   * Models saved before descendant paths were maintained can hold stale paths
+   * under a folder that was renamed or moved, so `fromJSON()` normalises them
+   * on load instead of waiting for the folder to be touched again. A file whose
+   * `parentId` no longer resolves is treated as a root file, which is what
+   * `addFile()` does with an unknown parent.
+   */
+  rebuildPaths(): void {
+    const byParent = this.childrenByParent();
+    const seen = new Set<string>();
+    const queue: DriveFile[] = [];
+    for (const file of this.files) {
+      if (file.parentId !== undefined && this.getFile(file.parentId)) continue;
+      file.path = `/${file.name}`;
+      seen.add(file.id);
+      queue.push(file);
+    }
+    while (queue.length > 0) {
+      const parent = queue.pop() as DriveFile;
+      for (const child of byParent.get(parent.id) ?? []) {
+        if (seen.has(child.id)) continue;
+        seen.add(child.id);
+        child.path = `${parent.path}/${child.name}`;
+        queue.push(child);
+      }
     }
   }
 
@@ -94,8 +152,12 @@ export class DriveModel {
   }
 
   static fromJSON(json: { files: DriveFile[] }): DriveModel {
-    return new DriveModel(
+    const model = new DriveModel(
       json.files.map((f) => ({ ...f, created_at: new Date(f.created_at), updated_at: new Date(f.updated_at) })),
     );
+    // Saved models can carry paths left stale by a folder rename or move made
+    // before descendant paths were maintained. Derive them from the tree.
+    model.rebuildPaths();
+    return model;
   }
 }

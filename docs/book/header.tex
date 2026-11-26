@@ -65,3 +65,60 @@
     \fi
   \fi
 }
+
+% Citeproc bibliography. The build runs pandoc with --citeproc, so pandoc emits
+% the reference list as
+%
+%     \begin{CSLReferences}{1}{0}
+%     \bibitem[\citeproctext]{ref-ellis1989} ...
+%
+% Pandoc only supplies the definitions for that markup when the template it is
+% given carries the `csl-refs` block. Eisvogel 2.4.0 predates it (the same
+% reason \pandocbounded has to be shimmed above), so CSLReferences never
+% existed and every \bibitem landed outside a list environment:
+%
+%     ! LaTeX Error: Lonely \item--perhaps a missing list environment.
+%     l.4972 \bibitem[\citeproctext]{ref-ellis1989}
+%
+% These are pandoc's own definitions from its default LaTeX template, each
+% added only when the template has not already supplied it, so a newer
+% Eisvogel keeps its own.
+\makeatletter
+\@ifundefined{citeproctext}{\newcommand{\citeproctext}{}}{}%
+\@ifundefined{cslhangindent}{%
+  \newlength{\cslhangindent}\setlength{\cslhangindent}{1.5em}%
+}{}%
+\@ifundefined{csllabelwidth}{%
+  \newlength{\csllabelwidth}\setlength{\csllabelwidth}{3em}%
+}{}%
+\@ifundefined{CSLBlock}{%
+  \newcommand{\CSLBlock}[1]{\hfill\break\parbox[t]{\linewidth}{\strut#1\strut}}%
+}{}%
+\@ifundefined{CSLLeftMargin}{%
+  \newcommand{\CSLLeftMargin}[1]{\parbox[t]{\csllabelwidth}{\strut#1\strut}}%
+}{}%
+\@ifundefined{CSLRightInline}{%
+  \newcommand{\CSLRightInline}[1]{%
+    \parbox[t]{\dimexpr\linewidth-\csllabelwidth\relax}{\strut#1\strut}}%
+}{}%
+\@ifundefined{CSLIndent}{%
+  \newcommand{\CSLIndent}[1]{\hspace{\cslhangindent}#1}%
+}{}%
+\@ifundefined{CSLReferences}{%
+  % #1 = hanging indent flag, #2 = entry spacing, as pandoc passes them.
+  \newenvironment{CSLReferences}[2]{%
+    \begin{list}{}{%
+      \setlength{\itemindent}{0pt}%
+      \setlength{\leftmargin}{0pt}%
+      \setlength{\parsep}{0pt}%
+      \ifodd #1%
+        \setlength{\leftmargin}{\cslhangindent}%
+        \setlength{\itemindent}{-1\cslhangindent}%
+      \fi%
+      \setlength{\itemsep}{#2\baselineskip}%
+    }%
+  }{%
+    \end{list}%
+  }%
+}{}%
+\makeatother

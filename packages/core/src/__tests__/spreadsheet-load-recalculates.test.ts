@@ -106,4 +106,62 @@ describe('SpreadsheetModel.fromJSON recalculates formulas', () => {
     // The caller's object still holds what was on disk.
     expect(json.sheets[0].cells['1:0'].computedValue).toBe(20);
   });
+
+  it('loads a dependency chain far deeper than the call stack', () => {
+    // fromJSON() now recalculates, and recalculate() orders the formulas with
+    // a depth-first search. A recursive search cost one frame per link, so a
+    // long chain threw RangeError out of fromJSON and the workbook never
+    // loaded. A1 = 1, then each cell adds 1 to the one above it.
+    const model = new SpreadsheetModel();
+    const id = model.activeSheetId;
+    const depth = 20000;
+    const sheet = (model as unknown as { sheets: { id: string; cells: Record<string, unknown> }[] })
+      .sheets[0];
+    // Written straight into the sheet: setCell() recalculates on every call,
+    // which would make building a chain this long quadratic.
+    sheet.cells['0:0'] = { value: '1' };
+    // Written deepest first, so the ordering walk starts at the far end of the
+    // chain and has to descend the whole way. Inserted the other way round,
+    // each cell's dependency is already visited and the walk never goes deep.
+    for (let r = depth; r >= 1; r -= 1) {
+      sheet.cells[`${r}:0`] = { value: `=A${r}+1`, formula: `=A${r}+1` };
+    }
+
+    let loaded: SpreadsheetModel | undefined;
+    expect(() => {
+      loaded = SpreadsheetModel.fromJSON(save(model));
+    }).not.toThrow();
+    expect(loaded!.getCell(id, 1, 0)?.computedValue).toBe(2);
+    expect(loaded!.getCell(id, depth, 0)?.computedValue).toBe(depth + 1);
+  });
+
+  it('loads a formula over a range far larger than the cells in it', () => {
+    // The dependency scan used to enumerate every coordinate a range spans and
+    // push a node id for each, once per formula, on every recalculate() — and
+    // fromJSON() now calls recalculate(). This range covers a million cells
+    // and two of them hold anything. Only formula cells can be graph nodes, so
+    // the scan now looks at the formulas in the sheet instead of the area.
+    const model = new SpreadsheetModel();
+    const id = model.activeSheetId;
+    model.setCell(id, 0, 0, '2');
+    model.setCell(id, 1, 0, '3');
+    // In B1, so the formula is not inside its own range.
+    model.setCell(id, 0, 1, '=SUM(A1:A1000000)');
+
+    const started = Date.now();
+    const loaded = SpreadsheetModel.fromJSON(save(model));
+    expect(Date.now() - started).toBeLessThan(5000);
+    expect(loaded.getCell(id, 0, 1)?.computedValue).toBe(5);
+  });
+
+  it('still reports a circular chain rather than looping', () => {
+    const model = new SpreadsheetModel();
+    const id = model.activeSheetId;
+    model.setCell(id, 0, 0, '=A2+1');
+    model.setCell(id, 1, 0, '=A1+1');
+
+    const loaded = SpreadsheetModel.fromJSON(save(model));
+    expect(loaded.getCell(id, 0, 0)?.computedValue).toBe('#CIRCULAR!');
+    expect(loaded.getCell(id, 1, 0)?.computedValue).toBe('#CIRCULAR!');
+  });
 });

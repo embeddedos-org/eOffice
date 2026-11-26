@@ -172,10 +172,26 @@ export class SpreadsheetModel {
       { sheetId: string; key: string; cell: Cell }
     >();
 
+    // Only a formula cell can be a node in this graph: a dependency on a plain
+    // value cell is a leaf and never needs expanding. Indexing the formula
+    // cells by sheet lets a range dependency enumerate the handful of formula
+    // cells inside it instead of every coordinate it spans, so =SUM(A1:ZZ99999)
+    // costs the number of formulas in the workbook, not the area of the range.
+    const formulaIndex = new Map<string, { row: number; col: number; key: string }[]>();
+    for (const entry of formulaCells) {
+      const parsed = entry.key.split(':');
+      const row = Number(parsed[0]);
+      const col = Number(parsed[1]);
+      const list = formulaIndex.get(entry.sheetId);
+      const item = { row, col, key: entry.key };
+      if (list) list.push(item);
+      else formulaIndex.set(entry.sheetId, [item]);
+    }
+
     for (const entry of formulaCells) {
       const nodeId = `${entry.sheetId}:${entry.key}`;
       cellLookup.set(nodeId, entry);
-      const deps = this.extractDependencies(entry.cell.formula!, entry.sheetId);
+      const deps = this.extractDependencies(entry.cell.formula!, entry.sheetId, formulaIndex);
       adjacency.set(nodeId, deps);
     }
 
@@ -184,27 +200,45 @@ export class SpreadsheetModel {
     const sorted: string[] = [];
     const circular = new Set<string>();
 
-    const dfs = (node: string): boolean => {
-      visited.add(node);
-      recStack.add(node);
+    // Iterative depth-first search. The recursive version cost one stack frame
+    // per link, so a long dependency chain (A1 <- A2 <- A3 <- ...) overflowed
+    // the call stack and threw out of recalculate(), which setCell and
+    // fromJSON both call. An explicit stack keeps the depth on the heap.
+    const dfs = (root: string): void => {
+      // `pending` is the dependency index this frame has still to look at.
+      const stack: { node: string; pending: number }[] = [];
+      visited.add(root);
+      recStack.add(root);
+      stack.push({ node: root, pending: 0 });
 
-      const neighbors = adjacency.get(node) || [];
-      for (const dep of neighbors) {
-        if (!visited.has(dep)) {
-          if (dfs(dep)) {
-            circular.add(node);
-            return true;
-          }
-        } else if (recStack.has(dep)) {
-          circular.add(node);
-          circular.add(dep);
-          return true;
+      while (stack.length > 0) {
+        const frame = stack[stack.length - 1];
+        const neighbors = adjacency.get(frame.node) || [];
+
+        if (frame.pending >= neighbors.length) {
+          // Every dependency handled: this node can be emitted.
+          recStack.delete(frame.node);
+          sorted.push(frame.node);
+          stack.pop();
+          continue;
         }
-      }
 
-      recStack.delete(node);
-      sorted.push(node);
-      return false;
+        const dep = neighbors[frame.pending];
+        frame.pending += 1;
+
+        if (recStack.has(dep)) {
+          // A back edge: every node still open is part of the cycle, which is
+          // what the recursive version marked as it unwound.
+          circular.add(dep);
+          for (const open of stack) circular.add(open.node);
+          continue;
+        }
+        if (visited.has(dep)) continue;
+
+        visited.add(dep);
+        recStack.add(dep);
+        stack.push({ node: dep, pending: 0 });
+      }
     };
 
     for (const nodeId of adjacency.keys()) {
@@ -234,9 +268,39 @@ export class SpreadsheetModel {
     }
   }
 
-  private extractDependencies(formula: string, sheetId: string): string[] {
+  /**
+   * Formula cells the formula depends on, as `sheetId:row:col` node ids.
+   *
+   * `formulaIndex` lists the formula cells of each sheet. A range dependency
+   * contributes only the formula cells that fall inside it, because a plain
+   * value cell is a leaf in the dependency graph and expanding it changes
+   * nothing. Without that, =SUM(A1:ZZ999999) enumerated every coordinate the
+   * range spans — hundreds of millions of strings — before recalculate() threw
+   * any of them away.
+   */
+  private extractDependencies(
+    formula: string,
+    sheetId: string,
+    formulaIndex: Map<string, { row: number; col: number; key: string }[]>,
+  ): string[] {
     const deps: string[] = [];
     const expr = formula.startsWith('=') ? formula.slice(1) : formula;
+
+    const pushRange = (
+      targetId: string,
+      start: { row: number; col: number },
+      end: { row: number; col: number },
+    ): void => {
+      const minRow = Math.min(start.row, end.row);
+      const maxRow = Math.max(start.row, end.row);
+      const minCol = Math.min(start.col, end.col);
+      const maxCol = Math.max(start.col, end.col);
+      for (const cell of formulaIndex.get(targetId) ?? []) {
+        if (cell.row < minRow || cell.row > maxRow) continue;
+        if (cell.col < minCol || cell.col > maxCol) continue;
+        deps.push(`${targetId}:${cell.key}`);
+      }
+    };
 
     const crossSheetRange = /(\w+)!([A-Z]+\d+):([A-Z]+\d+)/gi;
     let match: RegExpExecArray | null;
@@ -246,13 +310,7 @@ export class SpreadsheetModel {
       if (targetSheet) {
         const start = this.parseCellRef(match[2]);
         const end = this.parseCellRef(match[3]);
-        if (start && end) {
-          for (let r = start.row; r <= end.row; r++) {
-            for (let c = start.col; c <= end.col; c++) {
-              deps.push(`${targetSheet.id}:${this.cellKey(r, c)}`);
-            }
-          }
-        }
+        if (start && end) pushRange(targetSheet.id, start, end);
       }
       match = crossSheetRange.exec(expr);
     }
@@ -275,13 +333,7 @@ export class SpreadsheetModel {
     while (match !== null) {
       const start = this.parseCellRef(match[1]);
       const end = this.parseCellRef(match[2]);
-      if (start && end) {
-        for (let r = start.row; r <= end.row; r++) {
-          for (let c = start.col; c <= end.col; c++) {
-            deps.push(`${sheetId}:${this.cellKey(r, c)}`);
-          }
-        }
-      }
+      if (start && end) pushRange(sheetId, start, end);
       match = rangePattern.exec(expr);
     }
 
@@ -680,11 +732,11 @@ export class SpreadsheetModel {
           const arg = part.trim();
           const single = arg.match(/^(?:\w+!)?([A-Z]+\d+)$/i);
           const rangeArg = single ? `${arg}:${single[1]}` : arg;
-          const slots = this.rangeSlots(rangeArg, sheetId);
-          const isFormula = this.rangeFormulaSlots(rangeArg, sheetId);
-          count += slots.filter(
-            (v, i) => (v !== null && v !== '') || isFormula[i],
-          ).length;
+          // One pass, counting as it goes: a count needs no array of slots,
+          // and building two full-length ones for a large range (the values
+          // and a parallel "is it a formula" flag) only to filter them was
+          // what made a big sparse range expensive.
+          count += this.countRangeContent(rangeArg, sheetId);
         }
         return count;
       }
@@ -871,18 +923,36 @@ export class SpreadsheetModel {
   }
 
   /**
-   * Positionally aligned with rangeSlots: true where that slot is a cell
-   * holding a formula. A formula cell is content even when the formula
-   * evaluates to '', which rangeSlots cannot express — it reports '' as an
-   * empty slot, the same as a missing, deleted or formatted-only cell.
-   * COUNTA needs the two apart, so it reads this alongside rangeSlots.
+   * How many slots of a range hold content, for COUNTA.
+   *
+   * A cell holding a formula counts even when the formula returns '', which a
+   * value on its own cannot express: '' is also what a missing, deleted or
+   * formatted-only cell reads as. Counted in a single walk, so nothing
+   * proportional to the size of the range is held in memory.
    */
-  private rangeFormulaSlots(arg: string, sheetId: string): boolean[] {
+  private countRangeContent(arg: string, sheetId: string): number {
     const target = this.rangeTarget(arg, sheetId);
-    // Same lengths rangeSlots returns for these: one slot, and none.
-    if (target.kind === 'value' || target.kind === 'ref-error') return [false];
-    if (target.kind === 'empty') return [];
-    return this.rangeCells(target).map((cell) => Boolean(cell?.formula));
+    if (target.kind === 'empty') return 0;
+    if (target.kind === 'ref-error') return 1; // '#REF!' is itself content.
+    if (target.kind === 'value') {
+      const v = this.resolveValue(arg.trim(), sheetId);
+      return v !== null && v !== '' ? 1 : 0;
+    }
+
+    let count = 0;
+    for (let r = target.start.row; r <= target.end.row; r++) {
+      for (let c = target.start.col; c <= target.end.col; c++) {
+        const cell = target.sheet.cells[this.cellKey(r, c)];
+        if (!cell) continue;
+        if (cell.formula) {
+          count += 1;
+          continue;
+        }
+        const v = cell.computedValue !== undefined ? cell.computedValue : cell.value;
+        if (v !== '' && v !== null && v !== undefined) count += 1;
+      }
+    }
+    return count;
   }
 
   /**
@@ -979,7 +1049,11 @@ export class SpreadsheetModel {
         continue;
       }
 
-      values.push(this.resolveValue(trimmed, sheetId));
+      // Not a range: evaluate it as an expression, so a nested call or a
+      // grouped sum is a value rather than text. MAX(SUM(A1:A2),5) used to
+      // hand MAX the literal "SUM(A1:A2)", which it then discarded.
+      // evalSimpleExpression ends at resolveValue, so plain text is unchanged.
+      values.push(this.evalSimpleExpression(trimmed, sheetId));
     }
 
     return values;
@@ -1147,7 +1221,10 @@ export class SpreadsheetModel {
       if (depth === 0 && (ch === '+' || ch === '-')) {
         const left = trimmed.slice(0, i);
         const right = trimmed.slice(i + 1);
-        if (left.trim() && right.trim()) {
+        // A sign straight after another operator or "(" is a unary sign on the
+        // operand to its right, not a split point: the "-" in 10/-(2+3) and in
+        // 1--2 belongs to what follows it.
+        if (left.trim() && right.trim() && !/[+\-*/(]$/.test(left.trim())) {
           const l = this.evalSimpleExpression(left, sheetId);
           const r = this.evalSimpleExpression(right, sheetId);
           const ln = typeof l === 'number' ? l : Number(l);
@@ -1173,7 +1250,7 @@ export class SpreadsheetModel {
       if (depth === 0 && (ch === '*' || ch === '/')) {
         const left = trimmed.slice(0, i);
         const right = trimmed.slice(i + 1);
-        if (left.trim() && right.trim()) {
+        if (left.trim() && right.trim() && !/[+\-*/(]$/.test(left.trim())) {
           const l = this.evalSimpleExpression(left, sheetId);
           const r = this.evalSimpleExpression(right, sheetId);
           const ln = typeof l === 'number' ? l : Number(l);
@@ -1182,6 +1259,19 @@ export class SpreadsheetModel {
           if (ch === '/' && rn === 0) return '#ERROR!';
           return ch === '*' ? ln * rn : ln / rn;
         }
+      }
+    }
+
+    // A unary sign on a whole operand, e.g. -(2+3) or -SUM(A1:A2). Checked
+    // after the operator scans, so -5+1 is still an addition of -5 and 1
+    // rather than the negation of 5+1. A plain signed number never reaches
+    // here; Number() took it at the top.
+    if (trimmed.startsWith('-') || trimmed.startsWith('+')) {
+      const rest = trimmed.slice(1).trim();
+      if (rest) {
+        const v = this.evalSimpleExpression(rest, sheetId);
+        const n = typeof v === 'number' ? v : Number(v);
+        if (!isNaN(n)) return trimmed.startsWith('-') ? -n : n;
       }
     }
 

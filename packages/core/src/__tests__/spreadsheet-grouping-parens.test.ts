@@ -91,9 +91,36 @@ describe('SpreadsheetModel grouping parentheses', () => {
     expect(get('C3')).toBe(4);
   });
 
-  it('does not accept an unbalanced or empty group as a number', () => {
-    const get = sheet({ C1: '=2*(3+4', C2: '=2*()' });
-    expect(get('C1')).not.toBe(14);
-    expect(get('C2')).not.toBe(2);
+  it('rejects an unbalanced or empty group with the model error value', () => {
+    // Asserting the exact result, not just "something other than 14": an
+    // evaluator that accepted these and returned 0 would pass a != check.
+    const get = sheet({ C1: '=2*(3+4', C2: '=2*()', C3: '=(3+4', C4: '=()' });
+    expect(get('C1')).toBe('#ERROR!');
+    expect(get('C2')).toBe('#ERROR!');
+    expect(get('C3')).toBe('#ERROR!');
+    // "()" on its own has nothing to evaluate and stays as formula text.
+    expect(get('C4')).toBe('()');
+  });
+
+  it('applies a unary sign to a whole grouped operand', () => {
+    const get = sheet({
+      A1: '1',
+      A2: '2',
+      C1: '=-(2+3)',
+      C2: '=10/-(2+3)',
+      C3: '=-5+1',
+      C4: '=1--2',
+      C5: '=2*-3',
+      C6: '=-(A1)',
+      C7: '=-SUM(A1:A2)',
+    });
+    expect(get('C1')).toBe(-5);
+    expect(get('C2')).toBe(-2);
+    // A leading sign on a plain number is still an operand, not a negated sum.
+    expect(get('C3')).toBe(-4);
+    expect(get('C4')).toBe(3);
+    expect(get('C5')).toBe(-6);
+    expect(get('C6')).toBe(-1);
+    expect(get('C7')).toBe(-3);
   });
 });

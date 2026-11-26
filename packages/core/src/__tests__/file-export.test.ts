@@ -158,6 +158,32 @@ describe('File Export — exportToMarkdown', () => {
     expect(blobContent).toContain('`const x = 1;`');
   });
 
+  // <b>, <i>, <u> and <p> must not match tags that only start with the same
+  // letter (<br>, <blockquote>, <img>, <ul>, <pre>).
+  const md = (html: string): string => {
+    exportToMarkdown('Doc', html);
+    return (mockBlob.mock.calls[0][0] as string[]).join('');
+  };
+
+  it('keeps a <br> line break before bold text', () => {
+    expect(md('<p>Line one<br>Line <b>two</b></p>')).toContain('Line one\nLine **two**');
+  });
+
+  it('keeps an image that comes before italic text', () => {
+    expect(md('<p><img src="logo.png" alt="Logo"> Figure <i>one</i></p>'))
+      .toContain('![Logo](logo.png) Figure *one*');
+  });
+
+  it('keeps a list that comes before underlined text', () => {
+    const out = md('<ul><li>Item</li></ul><p>Read the <u>terms</u></p>');
+    expect(out).toContain('- Item');
+    expect(out).toContain('Read the __terms__');
+  });
+
+  it('keeps a blockquote that contains bold text', () => {
+    expect(md('<blockquote>Quote with <b>bold</b></blockquote>')).toContain('> Quote with **bold**');
+  });
+
   it('sets download filename with .md extension', () => {
     const anchor = { href: '', download: '', click: vi.fn() };
     mockCreateElement.mockReturnValue(anchor);

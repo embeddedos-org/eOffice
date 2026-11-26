@@ -60,11 +60,15 @@ export function exportToCsv(title: string, data: string[][]): void {
   download(`${title}.csv`, csv, 'text/csv');
 }
 
+// A plain decimal number, as SpreadsheetML Number cells expect. Number() alone
+// also accepts blank text (as 0), hex/binary/octal literals and "Infinity".
+const DECIMAL_NUMBER = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+
 export function exportToXlsx(title: string, data: string[][]): void {
   // Minimal XLSX: XML Spreadsheet 2003 format (widely supported)
   const rows = data.map((row) =>
     `<Row>${row.map((cell) => {
-      const isNum = cell !== '' && !isNaN(Number(cell));
+      const isNum = DECIMAL_NUMBER.test(cell.trim());
       return `<Cell><Data ss:Type="${isNum ? 'Number' : 'String'}">${escXml(cell)}</Data></Cell>`;
     }).join('')}</Row>`
   ).join('\n');
@@ -150,26 +154,28 @@ function decodeHtmlEntities(s: string): string {
 }
 
 function htmlToMarkdown(html: string): string {
+  // \b after each tag name: <b> must not match <br> or <blockquote>, <i> must
+  // not match <img>, <u> must not match <ul>, <p> must not match <pre>.
   return html
-    .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n\n')
-    .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n\n')
-    .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n\n')
-    .replace(/<h4[^>]*>(.*?)<\/h4>/gi, '#### $1\n\n')
-    .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
-    .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
-    .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
-    .replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*')
-    .replace(/<u[^>]*>(.*?)<\/u>/gi, '__$1__')
+    .replace(/<h1\b[^>]*>(.*?)<\/h1>/gi, '# $1\n\n')
+    .replace(/<h2\b[^>]*>(.*?)<\/h2>/gi, '## $1\n\n')
+    .replace(/<h3\b[^>]*>(.*?)<\/h3>/gi, '### $1\n\n')
+    .replace(/<h4\b[^>]*>(.*?)<\/h4>/gi, '#### $1\n\n')
+    .replace(/<strong\b[^>]*>(.*?)<\/strong>/gi, '**$1**')
+    .replace(/<b\b[^>]*>(.*?)<\/b>/gi, '**$1**')
+    .replace(/<em\b[^>]*>(.*?)<\/em>/gi, '*$1*')
+    .replace(/<i\b[^>]*>(.*?)<\/i>/gi, '*$1*')
+    .replace(/<u\b[^>]*>(.*?)<\/u>/gi, '__$1__')
     .replace(/<a\s+href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)')
     .replace(/<img\s+src="([^"]*)"[^>]*alt="([^"]*)"[^>]*\/?>/gi, '![$2]($1)')
     .replace(/<img\s+src="([^"]*)"[^>]*\/?>/gi, '![]($1)')
-    .replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gi, '> $1\n\n')
-    .replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`')
-    .replace(/<pre[^>]*>(.*?)<\/pre>/gi, '```\n$1\n```\n\n')
-    .replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
+    .replace(/<blockquote\b[^>]*>(.*?)<\/blockquote>/gi, '> $1\n\n')
+    .replace(/<code\b[^>]*>(.*?)<\/code>/gi, '`$1`')
+    .replace(/<pre\b[^>]*>(.*?)<\/pre>/gi, '```\n$1\n```\n\n')
+    .replace(/<li\b[^>]*>(.*?)<\/li>/gi, '- $1\n')
     .replace(/<\/?(ul|ol)[^>]*>/gi, '\n')
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n')
+    .replace(/<p\b[^>]*>(.*?)<\/p>/gi, '$1\n\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')

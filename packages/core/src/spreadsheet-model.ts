@@ -367,7 +367,8 @@ export class SpreadsheetModel {
         const searchVal = this.resolveValue(parts[0].trim(), sheetId);
         const rangeMatch = parts[1].trim().match(/^([A-Z]+\d+):([A-Z]+\d+)$/i);
         if (!rangeMatch) return '#ERROR!';
-        const colIndex = Number(this.resolveValue(parts[2].trim(), sheetId));
+        const colIndex = this.lookupIndex(this.resolveValue(parts[2].trim(), sheetId));
+        if (colIndex === null) return '#VALUE!';
         const exactMatch = parts.length > 3 ? this.resolveValue(parts[3].trim(), sheetId) === 0 : true;
 
         const start = this.parseCellRef(rangeMatch[1]);
@@ -400,7 +401,8 @@ export class SpreadsheetModel {
         const searchVal = this.resolveValue(parts[0].trim(), sheetId);
         const rangeMatch = parts[1].trim().match(/^([A-Z]+\d+):([A-Z]+\d+)$/i);
         if (!rangeMatch) return '#ERROR!';
-        const rowIndex = Number(this.resolveValue(parts[2].trim(), sheetId));
+        const rowIndex = this.lookupIndex(this.resolveValue(parts[2].trim(), sheetId));
+        if (rowIndex === null) return '#VALUE!';
 
         const start = this.parseCellRef(rangeMatch[1]);
         const end = this.parseCellRef(rangeMatch[2]);
@@ -429,8 +431,9 @@ export class SpreadsheetModel {
         if (parts.length < 3) return '#ERROR!';
         const rangeMatch = parts[0].trim().match(/^([A-Z]+\d+):([A-Z]+\d+)$/i);
         if (!rangeMatch) return '#ERROR!';
-        const rowIdx = Number(this.resolveValue(parts[1].trim(), sheetId));
-        const colIdx = Number(this.resolveValue(parts[2].trim(), sheetId));
+        const rowIdx = this.lookupIndex(this.resolveValue(parts[1].trim(), sheetId));
+        const colIdx = this.lookupIndex(this.resolveValue(parts[2].trim(), sheetId));
+        if (rowIdx === null || colIdx === null) return '#VALUE!';
 
         const start = this.parseCellRef(rangeMatch[1]);
         const end = this.parseCellRef(rangeMatch[2]);
@@ -638,7 +641,10 @@ export class SpreadsheetModel {
         const num = Number(this.resolveValue(parts[0].trim(), sheetId));
         const divisor = Number(this.resolveValue(parts[1].trim(), sheetId));
         if (isNaN(num) || isNaN(divisor) || divisor === 0) return '#ERROR!';
-        return num % divisor;
+        // A spreadsheet MOD takes the sign of the divisor (MOD(-3, 2) is 1);
+        // JavaScript's % takes the sign of the dividend (-3 % 2 is -1).
+        const rem = num % divisor;
+        return rem !== 0 && (rem < 0) !== (divisor < 0) ? rem + divisor : rem;
       }
       case 'INT': {
         const parts = this.splitTopLevelCommas(argsStr);
@@ -714,7 +720,12 @@ export class SpreadsheetModel {
         const parts = this.splitTopLevelCommas(argsStr);
         if (parts.length < 2) return '#ERROR!';
         const val = this.resolveValue(parts[0].trim(), sheetId);
-        if (String(val).startsWith('#')) {
+        // Only the error values this model writes count as errors. Text
+        // that merely starts with "#" ("#1 pick", "#hashtag") is a value.
+        const isError =
+          typeof val === 'string' &&
+          /^#(?:ERROR!|REF!|N\/A|VALUE!|DIV\/0!|CIRCULAR!)$/.test(val);
+        if (isError) {
           return this.resolveValue(parts[1].trim(), sheetId);
         }
         return val;
@@ -774,6 +785,19 @@ export class SpreadsheetModel {
           ? Math.floor(magnitude)
           : Math.round(magnitude);
     return Math.sign(num) * shift(rounded, -places);
+  }
+
+  /**
+   * A 1-based row/column index for VLOOKUP, HLOOKUP and INDEX, truncated like
+   * spreadsheets do (2.9 -> 2). Returns null for a value that is not a number
+   * or is below 1, so the caller reports #VALUE! instead of reading a cell
+   * outside the range.
+   */
+  private lookupIndex(value: string | number): number | null {
+    const n = typeof value === 'number' ? value : value.trim() === '' ? NaN : Number(value);
+    if (!Number.isFinite(n)) return null;
+    const idx = Math.trunc(n);
+    return idx >= 1 ? idx : null;
   }
 
   private matchesCriteria(value: string | number, criteria: string | number): boolean {
@@ -877,7 +901,11 @@ export class SpreadsheetModel {
     const values: (string | number)[] = [];
 
     for (const part of parts) {
-      const trimmed = part.trim();
+      // Read a single cell (A1, Sheet2!A1) as the one-cell range A1:A1, so a
+      // blank cell is left out as it is in a longer range. resolveValue would
+      // turn it into 0, which COUNT, AVERAGE, MIN and MAX then counted.
+      const single = part.trim().match(/^(?:\w+!)?([A-Z]+\d+)$/i);
+      const trimmed = single ? `${part.trim()}:${single[1]}` : part.trim();
 
       const crossSheetRange = trimmed.match(/^(\w+)!([A-Z]+\d+):([A-Z]+\d+)$/i);
       if (crossSheetRange) {
@@ -1219,9 +1247,9 @@ export class SpreadsheetModel {
 
     sheet.cells = {};
 
-    const lines = csv.split('\n');
-    for (let r = 0; r < lines.length; r++) {
-      const values = this.parseCSVLine(lines[r]);
+    const rows = this.parseCSV(csv);
+    for (let r = 0; r < rows.length; r++) {
+      const values = rows[r];
       for (let c = 0; c < values.length; c++) {
         const val = values[c];
         if (val !== '') {
@@ -1233,16 +1261,22 @@ export class SpreadsheetModel {
     this.recalculate();
   }
 
-  private parseCSVLine(line: string): string[] {
-    const result: string[] = [];
+  /**
+   * Split CSV text into rows of fields (RFC 4180). A quoted field may hold
+   * commas, doubled quotes and line breaks, as exportCSV writes them; a row
+   * ends at a \n or \r\n outside quotes.
+   */
+  private parseCSV(csv: string): string[][] {
+    const rows: string[][] = [];
+    let row: string[] = [];
     let current = '';
     let inQuotes = false;
 
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
+    for (let i = 0; i < csv.length; i++) {
+      const ch = csv[i];
       if (inQuotes) {
         if (ch === '"') {
-          if (i + 1 < line.length && line[i + 1] === '"') {
+          if (i + 1 < csv.length && csv[i + 1] === '"') {
             current += '"';
             i++;
           } else {
@@ -1251,19 +1285,24 @@ export class SpreadsheetModel {
         } else {
           current += ch;
         }
+      } else if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        row.push(current);
+        current = '';
+      } else if (ch === '\n' || (ch === '\r' && csv[i + 1] === '\n')) {
+        if (ch === '\r') i++;
+        row.push(current);
+        rows.push(row);
+        row = [];
+        current = '';
       } else {
-        if (ch === '"') {
-          inQuotes = true;
-        } else if (ch === ',') {
-          result.push(current);
-          current = '';
-        } else {
-          current += ch;
-        }
+        current += ch;
       }
     }
-    result.push(current);
-    return result;
+    row.push(current);
+    rows.push(row);
+    return rows;
   }
 
   // ── JSON serialization ───────────────────────────────────────────

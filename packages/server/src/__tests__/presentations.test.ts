@@ -291,4 +291,66 @@ describe('Presentations — PUT /:id/slides/reorder', () => {
     expect(reorderedSlides[1].id).toBe(slide1.id);
     expect(reorderedSlides[2].id).toBe(slide2.id);
   });
+
+  it('rejects a repeated slide id and keeps the deck unchanged', () => {
+    const pres = createPresentation('Reorder Dup Pres ' + Date.now());
+    const slide1 = addSlide(pres.id as string, 'Slide 1');
+    const slide2 = addSlide(pres.id as string, 'Slide 2');
+    const slide3 = addSlide(pres.id as string, 'Slide 3');
+
+    const res = mockRes();
+    findHandler('put', '/:id/slides/reorder')(mockReq({
+      params: { id: pres.id },
+      body: { order: [slide1.id, slide1.id, slide3.id] }
+    }), res);
+    expect(res.statusCode).toBe(400);
+
+    const getRes = mockRes();
+    findHandler('get', '/:id')(mockReq({ params: { id: pres.id } }), getRes);
+    const slides = (getRes.body as any).slides as any[];
+    expect(slides.map((s: any) => s.id)).toEqual([slide1.id, slide2.id, slide3.id]);
+  });
+
+  it('rejects an order that omits a slide instead of dropping it', () => {
+    const pres = createPresentation('Reorder Short Pres ' + Date.now());
+    const slide1 = addSlide(pres.id as string, 'Slide 1');
+    const slide2 = addSlide(pres.id as string, 'Slide 2');
+
+    const res = mockRes();
+    findHandler('put', '/:id/slides/reorder')(mockReq({
+      params: { id: pres.id },
+      body: { order: [slide2.id] }
+    }), res);
+    expect(res.statusCode).toBe(400);
+
+    const getRes = mockRes();
+    findHandler('get', '/:id')(mockReq({ params: { id: pres.id } }), getRes);
+    const slides = (getRes.body as any).slides as any[];
+    expect(slides.map((s: any) => s.id)).toEqual([slide1.id, slide2.id]);
+  });
+
+  it('rejects an unknown slide id and a non-string entry', () => {
+    const pres = createPresentation('Reorder Unknown Pres ' + Date.now());
+    const slide1 = addSlide(pres.id as string, 'Slide 1');
+    const slide2 = addSlide(pres.id as string, 'Slide 2');
+
+    const unknownRes = mockRes();
+    findHandler('put', '/:id/slides/reorder')(mockReq({
+      params: { id: pres.id },
+      body: { order: [slide1.id, 'missing'] }
+    }), unknownRes);
+    expect(unknownRes.statusCode).toBe(400);
+
+    const badTypeRes = mockRes();
+    findHandler('put', '/:id/slides/reorder')(mockReq({
+      params: { id: pres.id },
+      body: { order: [slide1.id, 42] }
+    }), badTypeRes);
+    expect(badTypeRes.statusCode).toBe(400);
+
+    const getRes = mockRes();
+    findHandler('get', '/:id')(mockReq({ params: { id: pres.id } }), getRes);
+    const slides = (getRes.body as any).slides as any[];
+    expect(slides.map((s: any) => s.id)).toEqual([slide1.id, slide2.id]);
+  });
 });

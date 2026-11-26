@@ -30,6 +30,8 @@ export class PresentationModel {
     for (const id of ids) {
       const slide = map.get(id);
       if (!slide) return false;
+      // Each slide must appear exactly once; a repeated id would drop another slide.
+      map.delete(id);
       reordered.push(slide);
     }
     this.slides = reordered;

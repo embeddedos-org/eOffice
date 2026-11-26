@@ -179,25 +179,11 @@ jobs:
             -V float-placement-figure=H \
             -V caption-justification=centering \
             -V table-use-row-colors=true \
-            -V "header-includes=\
-              \usepackage{float}\
-              \usepackage{booktabs}\
-              \usepackage{longtable}\
-              \usepackage{caption}\
-              \captionsetup{font=small,labelfont=bf,format=hang}\
-              \captionsetup[figure]{name=Figure}\
-              \captionsetup[table]{name=Table}\
-              \usepackage{fancyhdr}\
-              \pagestyle{fancy}\
-              \fancyhead[L]{\small\leftmark}\
-              \fancyhead[R]{\small ${{ steps.meta.outputs.version }}}\
-              \fancyfoot[C]{\small EmbeddedOS Press — embeddedos-org.github.io}\
-              \fancyfoot[R]{\thepage}\
-              \renewcommand{\headrulewidth}{0.4pt}\
-              \renewcommand{\footrulewidth}{0.2pt}\
-              \usepackage{graphicx}\
-              \makeatletter\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}\makeatother\
-              \setkeys{Gin}{width=\maxwidth,keepaspectratio}" \
+            -V 'header-left=\leftmark' \
+            -V "header-right=${{ steps.meta.outputs.version }}" \
+            -V "footer-center=EmbeddedOS Press — embeddedos-org.github.io" \
+            -V 'footer-right=\thepage' \
+            --include-in-header=header.tex \
             --highlight-style=tango \
             --number-sections
 

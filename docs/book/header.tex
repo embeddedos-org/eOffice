@@ -1,0 +1,47 @@
+% ---------------------------------------------------------------------------
+% Extra LaTeX preamble for the Book PDF build (.github/workflows/book-build.yml).
+%
+% Pandoc injects this at the `header-includes` slot, which in the Eisvogel
+% template is line ~473 — well BEFORE the template loads scrlayer-scrpage
+% (line ~866) to build its own header/footer. The build used to put
+% \usepackage{fancyhdr}\pagestyle{fancy} here, so fancyhdr defined \chead
+% first and scrlayer-scrpage then aborted xelatex with
+%
+%     ! LaTeX Error: Command \chead already defined.
+%
+% Every run of the workflow failed this way, so no release ever got a PDF.
+%
+% The header and footer are now configured through Eisvogel's own
+% header-left / header-right / footer-center / footer-right variables in the
+% workflow, which is what the template expects. Keep this file to the extra
+% packages that genuinely need to load early, and defer anything that depends
+% on scrlayer-scrpage to \AtBeginDocument, by which point it exists.
+% ---------------------------------------------------------------------------
+
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf,format=hang}
+\captionsetup[figure]{name=Figure}
+\captionsetup[table]{name=Table}
+
+% Never let an oversized image run past the text block.
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\makeatother
+\setkeys{Gin}{width=\maxwidth,keepaspectratio}
+
+% Running head: \leftmark follows the current chapter (or section, if the
+% build ever drops -V book=true). \automark belongs to scrlayer-scrpage, which
+% is not loaded yet, hence the deferral and the guards.
+\AtBeginDocument{%
+  \ifcsname automark\endcsname
+    \ifcsname chapter\endcsname
+      \automark[section]{chapter}%
+    \else
+      \automark{section}%
+    \fi
+  \fi
+}

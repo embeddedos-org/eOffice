@@ -727,11 +727,13 @@ root is `/name`, and a file inside a folder is `<folder path>/<name>`.
 - **A folder cannot be moved into itself or into one of its own subfolders.**
   Such a move is rejected and the tree is left untouched, rather than
   detaching the folder and its contents from the root.
-- **Loading a saved drive re-derives every path from the tree.** Drives saved
+- **`DriveModel.fromJSON()` re-derives every path from the tree.** Drives saved
   by an older version can contain paths left stale by a folder rename or move;
-  they are normalised on load instead of staying wrong until that folder is
-  touched again. A file whose parent no longer exists is treated as a root
-  file.
+  `@eoffice/core` normalises them on load instead of leaving them wrong until
+  that folder is touched again. A file whose parent no longer exists is treated
+  as a root file. The eDrive client does not use `DriveModel`: `useDrive` maps
+  each server record with `mapServerFile`, which keeps the `filePath` the
+  server returned.
 
 ---
 

@@ -99,10 +99,14 @@ export class DriveModel {
    */
   rebuildPaths(): void {
     const byParent = this.childrenByParent();
+    // One pass to index the ids, so the root test below is a lookup rather
+    // than a scan of `files`: getFile() is a linear find(), and calling it
+    // once per file made loading an n-file drive O(n^2).
+    const ids = new Set<string>(this.files.map((f) => f.id));
     const seen = new Set<string>();
     const queue: DriveFile[] = [];
     for (const file of this.files) {
-      if (file.parentId !== undefined && this.getFile(file.parentId)) continue;
+      if (file.parentId !== undefined && ids.has(file.parentId)) continue;
       file.path = `/${file.name}`;
       seen.add(file.id);
       queue.push(file);
@@ -120,12 +124,15 @@ export class DriveModel {
 
   /** True when `id` is `ancestorId` itself or lies somewhere under it. */
   private isSameOrDescendant(id: string, ancestorId: string): boolean {
+    // Indexed once for the walk: each step used the linear getFile(), so a
+    // deep chain cost O(depth * n) before the move was even allowed.
+    const byId = new Map<string, DriveFile>(this.files.map((f) => [f.id, f]));
     const seen = new Set<string>();
     let current: string | undefined = id;
     while (current !== undefined && !seen.has(current)) {
       if (current === ancestorId) return true;
       seen.add(current);
-      current = this.getFile(current)?.parentId;
+      current = byId.get(current)?.parentId;
     }
     return false;
   }

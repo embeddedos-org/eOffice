@@ -24,11 +24,13 @@ describe('PresentationModel.reorderSlides', () => {
   });
 
   it('never drops a slide or holds the same slide twice', () => {
-    const { model, a, b } = threeSlides();
-    model.reorderSlides([b.id, b.id, b.id]);
+    const { model, a, b, c } = threeSlides();
+    expect(model.reorderSlides([b.id, b.id, b.id])).toBe(false);
     const ids = model.slides.map((s) => s.id);
+    // Every original slide is still present, exactly once, in its original order.
+    expect(ids).toEqual([a.id, b.id, c.id]);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids).toContain(a.id);
+    expect(model.slides.map((s) => s)).toHaveLength(3);
   });
 
   it('still rejects an unknown id or a wrong length', () => {

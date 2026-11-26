@@ -502,6 +502,46 @@ parentheses **inside** a call's arguments belong to that call, so
 `=CONCATENATE("a+b", "-c")` is one call, not a subtraction, and the same is
 true of operators inside quoted text such as `=LEN("a)")*2`.
 
+### Grouping with Parentheses
+
+Parentheses group a sub-expression and are evaluated first, so they override
+the usual precedence:
+
+| Formula             | Result | Without the parentheses |
+|---------------------|--------|-------------------------|
+| `=2*(3+4)`          | `14`   | `2*3+4` would be `10`   |
+| `=(1+2)*(3+4)`      | `21`   |                         |
+| `=(2+3)*(4-1)/3`    | `5`    |                         |
+| `=-(2+3)`           | `-5`   | A sign applies to the whole group |
+| `=10/-(2+3)`        | `-2`   |                         |
+
+An unbalanced or empty group is not a number: `=2*(3+4` and `=2*()` both give
+`#ERROR!`. Parentheses inside quoted text are text, so `=LEN("a)")*2` is `4`.
+
+### Counting Cells
+
+`COUNTA` counts cells that hold something. A cell holding a **formula** counts
+even when that formula returns an empty string: a formula cell is not the same
+as a cell that is missing, has had its contents deleted, or only carries
+formatting.
+
+| Cell contents                 | Counted by `COUNTA`? |
+|-------------------------------|----------------------|
+| A number or text, including `0` | Yes                |
+| A formula returning `""`      | Yes                  |
+| Never filled in               | No                   |
+| Contents deleted              | No                   |
+| Only formatted (bold, colour) | No                   |
+
+### Recalculation on Load
+
+Opening a saved workbook **recalculates every formula** rather than showing the
+value cached when the file was saved. A cached value is only correct for the
+inputs and the engine version it was written with, so a workbook saved before
+an input changed — or before a formula bug was fixed — would otherwise keep
+showing the old number on screen and in CSV and XLS exports, with nothing to
+indicate it was stale.
+
 ---
 
 ## 3.3 eSlides — Presentation Builder

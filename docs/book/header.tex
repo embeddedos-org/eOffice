@@ -1,0 +1,115 @@
+% ---------------------------------------------------------------------------
+% Extra LaTeX preamble for the Book PDF build (.github/workflows/book-build.yml).
+%
+% Pandoc injects this at the `header-includes` slot, which in the Eisvogel
+% template is line ~473 — well BEFORE the template loads scrlayer-scrpage
+% (line ~866) to build its own header/footer. The build used to put
+% \usepackage{fancyhdr}\pagestyle{fancy} here, so fancyhdr defined \chead
+% first and scrlayer-scrpage then aborted xelatex with
+%
+%     ! LaTeX Error: Command \chead already defined.
+%
+% Every run of the workflow failed this way, so no release ever got a PDF.
+%
+% The header and footer are now configured through Eisvogel's own
+% header-left / header-right / footer-center / footer-right variables in the
+% workflow, which is what the template expects. Keep this file to the extra
+% packages that genuinely need to load early, and defer anything that depends
+% on scrlayer-scrpage to \AtBeginDocument, by which point it exists.
+% ---------------------------------------------------------------------------
+
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf,format=hang}
+\captionsetup[figure]{name=Figure}
+\captionsetup[table]{name=Table}
+
+% Never let an oversized image run past the text block.
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\makeatother
+\setkeys{Gin}{width=\maxwidth,keepaspectratio}
+
+% Pandoc 3.x wraps images in \pandocbounded and expects the template to define
+% it. Eisvogel 2.4.0 predates that, so every image expanded to an undefined
+% control sequence. This is pandoc's own definition from its default LaTeX
+% template, added only when the template has not supplied one, so a newer
+% Eisvogel keeps its own.
+\makeatletter
+\@ifundefined{pandocbounded}{%
+  \newsavebox\pandoc@box
+  \newcommand*\pandocbounded[1]{%
+    \sbox\pandoc@box{#1}%
+    \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+    \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+    \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi%
+    \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+    \else\usebox{\pandoc@box}%
+    \fi%
+  }%
+}{}%
+\makeatother
+
+% Running head. The build passes -V book=true but not
+% --top-level-division=chapter, so pandoc emits \section for the book's H1
+% headings and \chapter is never used. Marking on {chapter} would therefore
+% leave \leftmark -- which the workflow passes as header-left -- permanently
+% empty, even though scrbook defines \chapter and a \ifcsname test on it
+% succeeds. Mark on what is actually emitted. \automark belongs to
+% scrlayer-scrpage, which the template loads at line ~866, after this file is
+% injected at ~473, hence the deferral and the guard.
+\AtBeginDocument{%
+  \ifcsname automark\endcsname
+    \automark[subsection]{section}%
+  \fi
+}
+
+% Citeproc bibliography. The build runs pandoc with --citeproc, and pandoc
+% 3.1.7 changed the CSL reference list from a run of paragraphs into a list of
+% \bibitem entries:
+%
+%     \begin{CSLReferences}{1}{0}
+%     \bibitem[\citeproctext]{ref-ellis1989} ...
+%
+% Eisvogel 2.4.0 still carries the pre-3.1.7 definition (eisvogel.latex lines
+% 423-446): its CSLReferences only sets \parindent and \parskip, so it is not
+% a list environment and every \bibitem landed outside one --
+%
+%     ! LaTeX Error: Lonely \item--perhaps a missing list environment.
+%     l.5029 \bibitem[\citeproctext]{ref-ellis1989}
+%
+% -- which is the same Eisvogel-2.4.0-predates-pandoc-3 gap that already forced
+% the \pandocbounded shim above. The template emits its csl-refs block at line
+% ~423 and pandoc injects this file at header-includes, line ~473, so the
+% redefinition below lands after it and wins.
+%
+% Only the environment is replaced, with pandoc 3.6.1's own default-template
+% definition. Eisvogel's \CSLBlock, \CSLLeftMargin, \CSLRightInline and
+% \CSLIndent are character-for-character what pandoc 3.6.1 would supply, so
+% they are left alone. \citeproctext is new in 3.1.7 and Eisvogel never
+% defines it, hence the guard on that one.
+\makeatletter
+\@ifundefined{citeproctext}{\newcommand{\citeproctext}{}}{}%
+\@ifundefined{cslhangindent}{%
+  \newlength{\cslhangindent}\setlength{\cslhangindent}{1.5em}%
+}{}%
+\@ifundefined{CSLReferences}%
+  {\newenvironment{CSLReferences}[2]}%
+  {\renewenvironment{CSLReferences}[2]}%
+  {% #1 = hanging-indent flag, #2 = entry spacing, as pandoc passes them.
+    \begin{list}{}{%
+      \setlength{\itemindent}{0pt}%
+      \setlength{\leftmargin}{0pt}%
+      \setlength{\parsep}{0pt}%
+      \ifodd #1%
+        \setlength{\leftmargin}{\cslhangindent}%
+        \setlength{\itemindent}{-1\cslhangindent}%
+      \fi%
+      \setlength{\itemsep}{#2\baselineskip}%
+    }%
+  }%
+  {\end{list}}%
+\makeatother

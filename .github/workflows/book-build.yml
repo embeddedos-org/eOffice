@@ -133,6 +133,11 @@ jobs:
         run: |
           cd docs/book
 
+          # Note: -V values are injected into LaTeX as-is, so any LaTeX special
+          # character in one has to be escaped here. The author's "\&" is an
+          # alignment tab if written bare, which aborts the build with
+          # "Misplaced alignment tab character &".
+
           # Cover image
           COVER_ARGS=""
           if [ -f cover.png ]; then
@@ -163,7 +168,7 @@ jobs:
             -V page-background-color="ffffff" \
             -V "title=${{ steps.meta.outputs.title }}" \
             -V "subtitle=Version ${{ steps.meta.outputs.version }}" \
-            -V "author=Srikanth Patchava & EmbeddedOS Contributors" \
+            -V "author=Srikanth Patchava \& EmbeddedOS Contributors" \
             -V "date=$(date +'%B %Y')" \
             -V toc=true \
             -V toc-depth=3 \
@@ -179,25 +184,12 @@ jobs:
             -V float-placement-figure=H \
             -V caption-justification=centering \
             -V table-use-row-colors=true \
-            -V "header-includes=\
-              \usepackage{float}\
-              \usepackage{booktabs}\
-              \usepackage{longtable}\
-              \usepackage{caption}\
-              \captionsetup{font=small,labelfont=bf,format=hang}\
-              \captionsetup[figure]{name=Figure}\
-              \captionsetup[table]{name=Table}\
-              \usepackage{fancyhdr}\
-              \pagestyle{fancy}\
-              \fancyhead[L]{\small\leftmark}\
-              \fancyhead[R]{\small ${{ steps.meta.outputs.version }}}\
-              \fancyfoot[C]{\small EmbeddedOS Press — embeddedos-org.github.io}\
-              \fancyfoot[R]{\thepage}\
-              \renewcommand{\headrulewidth}{0.4pt}\
-              \renewcommand{\footrulewidth}{0.2pt}\
-              \usepackage{graphicx}\
-              \makeatletter\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}\makeatother\
-              \setkeys{Gin}{width=\maxwidth,keepaspectratio}" \
+            -V 'header-left=\leftmark' \
+            -V "header-right=${{ steps.meta.outputs.version }}" \
+            -V 'footer-left=\relax' \
+            -V "footer-center=EmbeddedOS Press — embeddedos-org.github.io" \
+            -V 'footer-right=\thepage' \
+            --include-in-header=header.tex \
             --highlight-style=tango \
             --number-sections
 

@@ -123,6 +123,19 @@ describe('SpreadsheetModel function calls inside arithmetic', () => {
     expect(get('C5')).toBe('#ERROR!');
   });
 
+  it('a call with empty parentheses does not recurse into an error', () => {
+    const get = sheet({ C1: '=NOW()', C2: '=TODAY()' });
+    expect(get('C1')).not.toBe('#ERROR!');
+    expect(get('C2')).not.toBe('#ERROR!');
+  });
+
+  it('a line break inside the parentheses does not recurse into an error', () => {
+    const get = sheet({ C1: '=SUM(1,\n2)', C2: '=SUM(1,\r\n2)', C3: '=SUM(1, 2)' });
+    expect(get('C1')).not.toBe('#ERROR!');
+    expect(get('C2')).not.toBe('#ERROR!');
+    expect(get('C3')).not.toBe('#ERROR!');
+  });
+
   it('never re-enters evaluation without progress', () => {
     // Driven through setCell/getCell rather than the private evaluator, per
     // TESTING.md. evaluateFormula catches a runaway recursion and reports
@@ -145,6 +158,7 @@ describe('SpreadsheetModel function calls inside arithmetic', () => {
       '=1+SUM(1,\r\n2)',
       '=SUM(1,\r2)*2',
       '=SUM(1,\u20292)-1',
+      '=SUM(1, 2)-1',
       '=SUM(\n)+1',
       '=IF(A1>0,\n1,2)+1',
       '=SUM(A1:A2',

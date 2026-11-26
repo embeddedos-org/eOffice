@@ -1,6 +1,21 @@
 import type { Cell, Sheet, CellFormat } from './types';
 import { generateId } from './utils';
 
+/** A range argument resolved to the block of cells it covers. */
+interface ResolvedRange {
+  kind: 'range';
+  sheet: Sheet;
+  start: { row: number; col: number };
+  end: { row: number; col: number };
+}
+
+/** How a range argument resolves. See rangeTarget. */
+type RangeTarget =
+  | ResolvedRange
+  | { kind: 'ref-error' }
+  | { kind: 'empty' }
+  | { kind: 'value' };
+
 export class SpreadsheetModel {
   public sheets: Sheet[];
   public activeSheetId: string;
@@ -157,10 +172,26 @@ export class SpreadsheetModel {
       { sheetId: string; key: string; cell: Cell }
     >();
 
+    // Only a formula cell can be a node in this graph: a dependency on a plain
+    // value cell is a leaf and never needs expanding. Indexing the formula
+    // cells by sheet lets a range dependency enumerate the handful of formula
+    // cells inside it instead of every coordinate it spans, so =SUM(A1:ZZ99999)
+    // costs the number of formulas in the workbook, not the area of the range.
+    const formulaIndex = new Map<string, { row: number; col: number; key: string }[]>();
+    for (const entry of formulaCells) {
+      const parsed = entry.key.split(':');
+      const row = Number(parsed[0]);
+      const col = Number(parsed[1]);
+      const list = formulaIndex.get(entry.sheetId);
+      const item = { row, col, key: entry.key };
+      if (list) list.push(item);
+      else formulaIndex.set(entry.sheetId, [item]);
+    }
+
     for (const entry of formulaCells) {
       const nodeId = `${entry.sheetId}:${entry.key}`;
       cellLookup.set(nodeId, entry);
-      const deps = this.extractDependencies(entry.cell.formula!, entry.sheetId);
+      const deps = this.extractDependencies(entry.cell.formula!, entry.sheetId, formulaIndex);
       adjacency.set(nodeId, deps);
     }
 
@@ -169,27 +200,45 @@ export class SpreadsheetModel {
     const sorted: string[] = [];
     const circular = new Set<string>();
 
-    const dfs = (node: string): boolean => {
-      visited.add(node);
-      recStack.add(node);
+    // Iterative depth-first search. The recursive version cost one stack frame
+    // per link, so a long dependency chain (A1 <- A2 <- A3 <- ...) overflowed
+    // the call stack and threw out of recalculate(), which setCell and
+    // fromJSON both call. An explicit stack keeps the depth on the heap.
+    const dfs = (root: string): void => {
+      // `pending` is the dependency index this frame has still to look at.
+      const stack: { node: string; pending: number }[] = [];
+      visited.add(root);
+      recStack.add(root);
+      stack.push({ node: root, pending: 0 });
 
-      const neighbors = adjacency.get(node) || [];
-      for (const dep of neighbors) {
-        if (!visited.has(dep)) {
-          if (dfs(dep)) {
-            circular.add(node);
-            return true;
-          }
-        } else if (recStack.has(dep)) {
-          circular.add(node);
-          circular.add(dep);
-          return true;
+      while (stack.length > 0) {
+        const frame = stack[stack.length - 1];
+        const neighbors = adjacency.get(frame.node) || [];
+
+        if (frame.pending >= neighbors.length) {
+          // Every dependency handled: this node can be emitted.
+          recStack.delete(frame.node);
+          sorted.push(frame.node);
+          stack.pop();
+          continue;
         }
-      }
 
-      recStack.delete(node);
-      sorted.push(node);
-      return false;
+        const dep = neighbors[frame.pending];
+        frame.pending += 1;
+
+        if (recStack.has(dep)) {
+          // A back edge: every node still open is part of the cycle, which is
+          // what the recursive version marked as it unwound.
+          circular.add(dep);
+          for (const open of stack) circular.add(open.node);
+          continue;
+        }
+        if (visited.has(dep)) continue;
+
+        visited.add(dep);
+        recStack.add(dep);
+        stack.push({ node: dep, pending: 0 });
+      }
     };
 
     for (const nodeId of adjacency.keys()) {
@@ -219,9 +268,39 @@ export class SpreadsheetModel {
     }
   }
 
-  private extractDependencies(formula: string, sheetId: string): string[] {
+  /**
+   * Formula cells the formula depends on, as `sheetId:row:col` node ids.
+   *
+   * `formulaIndex` lists the formula cells of each sheet. A range dependency
+   * contributes only the formula cells that fall inside it, because a plain
+   * value cell is a leaf in the dependency graph and expanding it changes
+   * nothing. Without that, =SUM(A1:ZZ999999) enumerated every coordinate the
+   * range spans — hundreds of millions of strings — before recalculate() threw
+   * any of them away.
+   */
+  private extractDependencies(
+    formula: string,
+    sheetId: string,
+    formulaIndex: Map<string, { row: number; col: number; key: string }[]>,
+  ): string[] {
     const deps: string[] = [];
     const expr = formula.startsWith('=') ? formula.slice(1) : formula;
+
+    const pushRange = (
+      targetId: string,
+      start: { row: number; col: number },
+      end: { row: number; col: number },
+    ): void => {
+      const minRow = Math.min(start.row, end.row);
+      const maxRow = Math.max(start.row, end.row);
+      const minCol = Math.min(start.col, end.col);
+      const maxCol = Math.max(start.col, end.col);
+      for (const cell of formulaIndex.get(targetId) ?? []) {
+        if (cell.row < minRow || cell.row > maxRow) continue;
+        if (cell.col < minCol || cell.col > maxCol) continue;
+        deps.push(`${targetId}:${cell.key}`);
+      }
+    };
 
     const crossSheetRange = /(\w+)!([A-Z]+\d+):([A-Z]+\d+)/gi;
     let match: RegExpExecArray | null;
@@ -231,13 +310,7 @@ export class SpreadsheetModel {
       if (targetSheet) {
         const start = this.parseCellRef(match[2]);
         const end = this.parseCellRef(match[3]);
-        if (start && end) {
-          for (let r = start.row; r <= end.row; r++) {
-            for (let c = start.col; c <= end.col; c++) {
-              deps.push(`${targetSheet.id}:${this.cellKey(r, c)}`);
-            }
-          }
-        }
+        if (start && end) pushRange(targetSheet.id, start, end);
       }
       match = crossSheetRange.exec(expr);
     }
@@ -260,13 +333,7 @@ export class SpreadsheetModel {
     while (match !== null) {
       const start = this.parseCellRef(match[1]);
       const end = this.parseCellRef(match[2]);
-      if (start && end) {
-        for (let r = start.row; r <= end.row; r++) {
-          for (let c = start.col; c <= end.col; c++) {
-            deps.push(`${sheetId}:${this.cellKey(r, c)}`);
-          }
-        }
-      }
+      if (start && end) pushRange(sheetId, start, end);
       match = rangePattern.exec(expr);
     }
 
@@ -294,14 +361,16 @@ export class SpreadsheetModel {
 
   private evalExpression(expr: string, sheetId: string): string | number {
     const funcMatch = expr.match(/^([A-Z]+)\((.+)\)$/i);
-    if (funcMatch) {
+    // Only a single call if the "(" after the name closes at the very end;
+    // =SUM(A1:A2)+SUM(B1:B2) also starts with a name and ends with ")".
+    if (funcMatch && this.closingParenIndex(expr, funcMatch[1].length) === expr.length - 1) {
       const funcName = funcMatch[1].toUpperCase();
       const argsStr = funcMatch[2];
       return this.evalFunction(funcName, argsStr, sheetId);
     }
 
     const ifMatch = expr.match(/^IF\((.+)\)$/i);
-    if (ifMatch) {
+    if (ifMatch && this.closingParenIndex(expr, 2) === expr.length - 1) {
       return this.evalFunction('IF', ifMatch[1], sheetId);
     }
 
@@ -665,12 +734,19 @@ export class SpreadsheetModel {
         // Count what is not empty. A 0 is a value; an empty cell is not.
         // Single-cell references go through rangeSlots too, because
         // resolveValue reads an empty cell as 0.
+        // A cell holding a formula counts even when the formula returns '',
+        // which rangeSlots reports as an empty slot: a formula cell is not
+        // the same as a missing, deleted or formatted-only cell.
         let count = 0;
         for (const part of this.splitTopLevelCommas(argsStr)) {
           const arg = part.trim();
           const single = arg.match(/^(?:\w+!)?([A-Z]+\d+)$/i);
-          const slots = this.rangeSlots(single ? `${arg}:${single[1]}` : arg, sheetId);
-          count += slots.filter((v) => v !== null && v !== '').length;
+          const rangeArg = single ? `${arg}:${single[1]}` : arg;
+          // One pass, counting as it goes: a count needs no array of slots,
+          // and building two full-length ones for a large range (the values
+          // and a parallel "is it a formula" flag) only to filter them was
+          // what made a big sparse range expensive.
+          count += this.countRangeContent(rangeArg, sheetId);
         }
         return count;
       }
@@ -842,6 +918,64 @@ export class SpreadsheetModel {
    * single value.
    */
   private rangeSlots(arg: string, sheetId: string): (string | number | null)[] {
+    const target = this.rangeTarget(arg, sheetId);
+    if (target.kind === 'value') return [this.resolveValue(arg.trim(), sheetId)];
+    if (target.kind === 'ref-error') return ['#REF!'];
+    if (target.kind === 'empty') return [];
+
+    const slots: (string | number | null)[] = [];
+    for (const cell of this.rangeCells(target)) {
+      const v = cell ? (cell.computedValue !== undefined ? cell.computedValue : cell.value) : '';
+      if (v === '') {
+        // No cell, or one whose content was deleted or only formatted.
+        slots.push(null);
+        continue;
+      }
+      const num = Number(v);
+      slots.push(isNaN(num) ? String(v) : num);
+    }
+    return slots;
+  }
+
+  /**
+   * How many slots of a range hold content, for COUNTA.
+   *
+   * A cell holding a formula counts even when the formula returns '', which a
+   * value on its own cannot express: '' is also what a missing, deleted or
+   * formatted-only cell reads as. Counted in a single walk, so nothing
+   * proportional to the size of the range is held in memory.
+   */
+  private countRangeContent(arg: string, sheetId: string): number {
+    const target = this.rangeTarget(arg, sheetId);
+    if (target.kind === 'empty') return 0;
+    if (target.kind === 'ref-error') return 1; // '#REF!' is itself content.
+    if (target.kind === 'value') {
+      const v = this.resolveValue(arg.trim(), sheetId);
+      return v !== null && v !== '' ? 1 : 0;
+    }
+
+    let count = 0;
+    for (let r = target.start.row; r <= target.end.row; r++) {
+      for (let c = target.start.col; c <= target.end.col; c++) {
+        const cell = target.sheet.cells[this.cellKey(r, c)];
+        if (!cell) continue;
+        if (cell.formula) {
+          count += 1;
+          continue;
+        }
+        const v = cell.computedValue !== undefined ? cell.computedValue : cell.value;
+        if (v !== '' && v !== null && v !== undefined) count += 1;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * How a range argument resolves: the block of cells it covers, a '#REF!'
+   * for an unknown sheet name, 'empty' for a range whose refs do not parse,
+   * or 'value' when the argument is not a range at all.
+   */
+  private rangeTarget(arg: string, sheetId: string): RangeTarget {
     const trimmed = arg.trim();
     let targetId = sheetId;
     let startRef: string;
@@ -850,7 +984,7 @@ export class SpreadsheetModel {
     const rangeMatch = trimmed.match(/^([A-Z]+\d+):([A-Z]+\d+)$/i);
     if (crossSheetRange) {
       const targetSheet = this.sheets.find((s) => s.name === crossSheetRange[1]);
-      if (!targetSheet) return ['#REF!'];
+      if (!targetSheet) return { kind: 'ref-error' };
       targetId = targetSheet.id;
       startRef = crossSheetRange[2];
       endRef = crossSheetRange[3];
@@ -858,29 +992,25 @@ export class SpreadsheetModel {
       startRef = rangeMatch[1];
       endRef = rangeMatch[2];
     } else {
-      return [this.resolveValue(trimmed, sheetId)];
+      return { kind: 'value' };
     }
 
     const start = this.parseCellRef(startRef);
     const end = this.parseCellRef(endRef);
     const sheet = this.getSheet(targetId);
-    if (!start || !end || !sheet) return [];
+    if (!start || !end || !sheet) return { kind: 'empty' };
+    return { kind: 'range', sheet, start, end };
+  }
 
-    const slots: (string | number | null)[] = [];
-    for (let r = start.row; r <= end.row; r++) {
-      for (let c = start.col; c <= end.col; c++) {
-        const cell = sheet.cells[this.cellKey(r, c)];
-        const v = cell ? (cell.computedValue !== undefined ? cell.computedValue : cell.value) : '';
-        if (v === '') {
-          // No cell, or one whose content was deleted or only formatted.
-          slots.push(null);
-          continue;
-        }
-        const num = Number(v);
-        slots.push(isNaN(num) ? String(v) : num);
+  /** The cells a resolved range covers, row-major, undefined where unset. */
+  private rangeCells(target: ResolvedRange): (Cell | undefined)[] {
+    const cells: (Cell | undefined)[] = [];
+    for (let r = target.start.row; r <= target.end.row; r++) {
+      for (let c = target.start.col; c <= target.end.col; c++) {
+        cells.push(target.sheet.cells[this.cellKey(r, c)]);
       }
     }
-    return slots;
+    return cells;
   }
 
   private splitTopLevelCommas(str: string): string[] {
@@ -934,7 +1064,11 @@ export class SpreadsheetModel {
         continue;
       }
 
-      values.push(this.resolveValue(trimmed, sheetId));
+      // Not a range: evaluate it as an expression, so a nested call or a
+      // grouped sum is a value rather than text. MAX(SUM(A1:A2),5) used to
+      // hand MAX the literal "SUM(A1:A2)", which it then discarded.
+      // evalSimpleExpression ends at resolveValue, so plain text is unchanged.
+      values.push(this.evalSimpleExpression(trimmed, sheetId));
     }
 
     return values;
@@ -1063,14 +1197,49 @@ export class SpreadsheetModel {
     const num = Number(trimmed);
     if (!isNaN(num) && trimmed.length > 0) return num;
 
+    // A whole function call used as an operand, e.g. SUM(A1:A2) in SUM(A1:A2)*2.
+    // Same test as the single-call branch in evalExpression, and evalFunction
+    // is called directly, so this never hands the text back to evalExpression.
+    // Anything that test rejects (NOW(), a line break inside the parentheses)
+    // is left to the code below, as before.
+    const call = trimmed.match(/^([A-Z]+)\((.+)\)$/i);
+    if (call && this.closingParenIndex(trimmed, call[1].length) === trimmed.length - 1) {
+      return this.evalFunction(call[1].toUpperCase(), call[2], sheetId);
+    }
+
+    // A grouping parenthesis around the whole operand, e.g. (3+4) in 2*(3+4).
+    // The operator scans below only split at depth 0, so a group always
+    // arrives here whole; evaluating its inside is what gives "(" its
+    // precedence. Checked after the call branch so SUM(...) is still a call,
+    // and only when "(" closes at the very end, so (1+2)*(3+4) is left to the
+    // scans below instead of being read as one group.
+    if (trimmed.startsWith('(') && this.closingParenIndex(trimmed, 0) === trimmed.length - 1) {
+      const inner = trimmed.slice(1, -1);
+      // "()" has nothing to evaluate; fall through and treat it as text.
+      if (inner.trim()) return this.evalSimpleExpression(inner, sheetId);
+    }
+
     // Addition/subtraction (lowest precedence — split here first)
     // Find the rightmost + or - that isn't inside a leading position
+    // or inside a function call's parentheses or a quoted string
+    let depth = 0;
+    let quote = '';
     for (let i = trimmed.length - 1; i > 0; i--) {
       const ch = trimmed[i];
-      if (ch === '+' || ch === '-') {
+      if (quote) {
+        if (ch === quote) quote = '';
+        continue;
+      }
+      if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === ')') depth++;
+      else if (ch === '(') depth--;
+      if (depth === 0 && (ch === '+' || ch === '-')) {
         const left = trimmed.slice(0, i);
         const right = trimmed.slice(i + 1);
-        if (left.trim() && right.trim()) {
+        // A sign straight after another operator or "(" is a unary sign on the
+        // operand to its right, not a split point: the "-" in 10/-(2+3) and in
+        // 1--2 belongs to what follows it.
+        if (left.trim() && right.trim() && !/[+\-*/(]$/.test(left.trim())) {
           const l = this.evalSimpleExpression(left, sheetId);
           const r = this.evalSimpleExpression(right, sheetId);
           const ln = typeof l === 'number' ? l : Number(l);
@@ -1082,12 +1251,21 @@ export class SpreadsheetModel {
     }
 
     // Multiplication/division (higher precedence)
+    depth = 0;
+    quote = '';
     for (let i = trimmed.length - 1; i > 0; i--) {
       const ch = trimmed[i];
-      if (ch === '*' || ch === '/') {
+      if (quote) {
+        if (ch === quote) quote = '';
+        continue;
+      }
+      if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === ')') depth++;
+      else if (ch === '(') depth--;
+      if (depth === 0 && (ch === '*' || ch === '/')) {
         const left = trimmed.slice(0, i);
         const right = trimmed.slice(i + 1);
-        if (left.trim() && right.trim()) {
+        if (left.trim() && right.trim() && !/[+\-*/(]$/.test(left.trim())) {
           const l = this.evalSimpleExpression(left, sheetId);
           const r = this.evalSimpleExpression(right, sheetId);
           const ln = typeof l === 'number' ? l : Number(l);
@@ -1099,10 +1277,46 @@ export class SpreadsheetModel {
       }
     }
 
+    // A unary sign on a whole operand, e.g. -(2+3) or -SUM(A1:A2). Checked
+    // after the operator scans, so -5+1 is still an addition of -5 and 1
+    // rather than the negation of 5+1. A plain signed number never reaches
+    // here; Number() took it at the top.
+    if (trimmed.startsWith('-') || trimmed.startsWith('+')) {
+      const rest = trimmed.slice(1).trim();
+      if (rest) {
+        const v = this.evalSimpleExpression(rest, sheetId);
+        const n = typeof v === 'number' ? v : Number(v);
+        if (!isNaN(n)) return trimmed.startsWith('-') ? -n : n;
+      }
+    }
+
     return this.resolveValue(trimmed, sheetId);
   }
 
   // ── Helper methods ────────────────────────────────────────────────
+
+  /**
+   * Index of the ")" that closes the "(" at openIndex, or -1.
+   * Parentheses inside "..." or '...' strings are not counted.
+   */
+  private closingParenIndex(expr: string, openIndex: number): number {
+    let depth = 0;
+    let quote = '';
+    for (let i = openIndex; i < expr.length; i++) {
+      const ch = expr[i];
+      if (quote) {
+        if (ch === quote) quote = '';
+      } else if (ch === '"' || ch === "'") {
+        quote = ch;
+      } else if (ch === '(') {
+        depth++;
+      } else if (ch === ')') {
+        depth--;
+        if (depth === 0) return i;
+      }
+    }
+    return -1;
+  }
 
   private cellKey(row: number, col: number): string {
     return `${row}:${col}`;
@@ -1284,11 +1498,23 @@ export class SpreadsheetModel {
     model.sheets = json.sheets.map((s) => ({
       id: s.id,
       name: s.name,
-      cells: { ...s.cells },
+      // Copy each cell, not just the map: recalculate() below writes
+      // computedValue, which must not reach back into the caller's JSON.
+      cells: Object.fromEntries(
+        Object.entries(s.cells ?? {}).map(([key, cell]) => [key, { ...cell }]),
+      ),
       columnWidths: s.columnWidths ? { ...s.columnWidths } : {},
       rowHeights: s.rowHeights ? { ...s.rowHeights } : {},
     }));
     model.activeSheetId = json.activeSheetId;
+    // A saved computedValue is a cache of what the formula meant when it was
+    // written. Trusting it shows the reader a stale number whenever an input
+    // or the evaluator has changed since the save, with nothing on screen to
+    // say so, and the stale value also flows into CSV and XLS exports.
+    // Recomputing on load is what a spreadsheet is expected to do. Cost: one
+    // recalculate() per load, the same pass every setCell already runs, and
+    // it returns immediately when the workbook holds no formulas.
+    model.recalculate();
     return model;
   }
 }

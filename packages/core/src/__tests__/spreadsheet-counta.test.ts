@@ -56,4 +56,43 @@ describe('COUNTA', () => {
     model.setCellFormat(id, 4, 0, { bold: true }); // A5 formatted only
     expect(formula(model, id, '=COUNTA(A1:A6)')).toBe(2);
   });
+
+  // Issue #66: a formula that returns '' still holds a formula, so the cell
+  // is not empty. rangeSlots reports '' as an empty slot, the same as a
+  // missing cell, so COUNTA used to skip it and undercount.
+  describe('a formula whose result is an empty string', () => {
+    it('counts it in a range', () => {
+      const { model, id } = sheet(['x', '=IF(1>2,"y","")']);
+      // A3 is genuinely empty.
+      expect(formula(model, id, '=COUNTA(A1:A3)')).toBe(2);
+    });
+
+    it('counts it as a single-cell argument', () => {
+      const { model, id } = sheet(['=IF(1>2,"y","")']);
+      expect(formula(model, id, '=COUNTA(A1)')).toBe(1);
+    });
+
+    it('counts several of them, and still skips the empty cells', () => {
+      const { model, id } = sheet(['=IF(1>2,"y","")', '', '=IF(1>2,"y","")', '5']);
+      model.setCell(id, 4, 0, ''); // A5 deleted
+      model.setCellFormat(id, 5, 0, { bold: true }); // A6 formatted only
+      expect(formula(model, id, '=COUNTA(A1:A6)')).toBe(3);
+    });
+
+    it('counts it on another sheet', () => {
+      const model = new SpreadsheetModel();
+      const first = model.activeSheetId;
+      const other = model.addSheet('Data').id;
+      model.setCell(other, 0, 0, '=IF(1>2,"y","")');
+      model.setCell(other, 1, 0, 'y');
+      model.setCell(first, 0, 5, '=COUNTA(Data!A1:A3)');
+      expect(model.getCell(first, 0, 5)?.computedValue).toBe(2);
+    });
+
+    it('does not make a plain empty-text cell count', () => {
+      const { model, id } = sheet(['a']);
+      model.setCell(id, 1, 0, ''); // A2 holds no formula
+      expect(formula(model, id, '=COUNTA(A1:A2)')).toBe(1);
+    });
+  });
 });

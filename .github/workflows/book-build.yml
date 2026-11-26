@@ -186,6 +186,7 @@ jobs:
             -V table-use-row-colors=true \
             -V 'header-left=\leftmark' \
             -V "header-right=${{ steps.meta.outputs.version }}" \
+            -V 'footer-left=\relax' \
             -V "footer-center=EmbeddedOS Press — embeddedos-org.github.io" \
             -V 'footer-right=\thepage' \
             --include-in-header=header.tex \

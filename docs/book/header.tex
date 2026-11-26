@@ -53,16 +53,17 @@
 }{}%
 \makeatother
 
-% Running head: \leftmark follows the current chapter (or section, if the
-% build ever drops -V book=true). \automark belongs to scrlayer-scrpage, which
-% is not loaded yet, hence the deferral and the guards.
+% Running head. The build passes -V book=true but not
+% --top-level-division=chapter, so pandoc emits \section for the book's H1
+% headings and \chapter is never used. Marking on {chapter} would therefore
+% leave \leftmark -- which the workflow passes as header-left -- permanently
+% empty, even though scrbook defines \chapter and a \ifcsname test on it
+% succeeds. Mark on what is actually emitted. \automark belongs to
+% scrlayer-scrpage, which the template loads at line ~866, after this file is
+% injected at ~473, hence the deferral and the guard.
 \AtBeginDocument{%
   \ifcsname automark\endcsname
-    \ifcsname chapter\endcsname
-      \automark[section]{chapter}%
-    \else
-      \automark{section}%
-    \fi
+    \automark[subsection]{section}%
   \fi
 }
 

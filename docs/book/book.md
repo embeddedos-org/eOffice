@@ -480,6 +480,28 @@ interface CellFormat {
 | Date/Time     | NOW, TODAY, YEAR, MONTH, DAY                     |
 | Financial     | PMT, FV, PV, RATE, NPV                          |
 
+### Combining Function Calls with Arithmetic
+
+A function call is an ordinary operand: it can be combined with `+`, `-`, `*`
+and `/`, on either side of the operator, and mixed with cell references and
+literals.
+
+| Formula                            | Meaning                              |
+|------------------------------------|--------------------------------------|
+| `=SUM(A1:A2)+SUM(B1:B2)`           | Two calls added                      |
+| `=MAX(A1:B2)-MIN(A1:B2)`           | The range's spread                   |
+| `=SUM(A1:A2)*2`, `=2*SUM(A1:A2)`   | A call on either side of an operator |
+| `=A1+SUM(B1:B2)`                   | A cell reference and a call          |
+| `=IF(A1>0, 5, 0)+1`                | Arithmetic on an `IF` result         |
+| `=MAX(SUM(A1:A2), 5)*2`            | A call nested inside another call    |
+| `=NOW()+1`, `=SUM()+1`             | Calls that take no arguments         |
+
+Precedence follows the usual rules: `*` and `/` bind more tightly than `+` and
+`-`, and operators at the same level are applied left to right. Operators and
+parentheses **inside** a call's arguments belong to that call, so
+`=CONCATENATE("a+b", "-c")` is one call, not a subtraction, and the same is
+true of operators inside quoted text such as `=LEN("a)")*2`.
+
 ### Grouping with Parentheses
 
 Parentheses group a sub-expression and are evaluated first, so they override

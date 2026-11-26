@@ -150,25 +150,38 @@ describe('SpreadsheetModel function calls inside arithmetic', () => {
       return model.getCell(id, 9, 9)?.computedValue;
     };
 
-    for (const formula of [
-      '=NOW()',
-      '=NOW()+1',
-      '=SUM(1,\n2)',
-      '=SUM(1,\n2)+1',
-      '=1+SUM(1,\r\n2)',
-      '=SUM(1,\r2)*2',
-      '=SUM(1,\u20292)-1',
-      '=SUM(1, 2)-1',
-      '=SUM(\n)+1',
-      '=IF(A1>0,\n1,2)+1',
-      '=SUM(A1:A2',
-      '=SUM(A1:A2))*2',
-      '=SUM((A1:A2))*2',
-      '=(SUM(A1:A2))',
-    ]) {
+    // Each case is pinned to the value the evaluator actually produces.
+    // Asserting only "it returned something" let a '#ERROR!' from runaway
+    // re-entry pass, which is the very failure this test exists to catch.
+    const cases: Array<[string, unknown]> = [
+      // A line terminator inside the parentheses is not a call, so the
+      // formula text comes back unevaluated...
+      ['=SUM(1,\n2)', 'SUM(1,\n2)'],
+      ['=SUM(A1:A2', 'SUM(A1:A2'],
+      // ...and as an operand that text is not a number, so arithmetic says so.
+      ['=SUM(1,\n2)+1', '#ERROR!'],
+      ['=1+SUM(1,\r\n2)', '#ERROR!'],
+      ['=SUM(1,\r2)*2', '#ERROR!'],
+      ['=SUM(1,\u20292)-1', '#ERROR!'],
+      ['=SUM(\n)+1', '#ERROR!'],
+      ['=IF(A1>0,\n1,2)+1', '#ERROR!'],
+      ['=SUM(A1:A2))*2', '#ERROR!'],
+      // Ordinary separators still evaluate: A1=1, A2=2.
+      ['=SUM(1, 2)-1', 2],
+      ['=(SUM(A1:A2))', 3],
+      ['=SUM((A1:A2))*2', 0],
+    ];
+    for (const [formula, expected] of cases) {
       expect(() => evaluate(formula), JSON.stringify(formula)).not.toThrow();
-      // Whatever it decides, it has to decide something.
-      expect(evaluate(formula), JSON.stringify(formula)).toBeDefined();
+      expect(evaluate(formula), JSON.stringify(formula)).toBe(expected);
+    }
+
+    // NOW() is a clock reading, so pin its shape rather than its value, and
+    // say explicitly that it is not the error a recursion failure returns.
+    for (const formula of ['=NOW()', '=NOW()+1']) {
+      expect(() => evaluate(formula), formula).not.toThrow();
+      expect(typeof evaluate(formula), formula).toBe('number');
+      expect(evaluate(formula), formula).not.toBe('#ERROR!');
     }
 
     expect(evaluate('=SUM(1,\t2)*2')).toBe(6);

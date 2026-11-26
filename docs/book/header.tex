@@ -33,6 +33,26 @@
 \makeatother
 \setkeys{Gin}{width=\maxwidth,keepaspectratio}
 
+% Pandoc 3.x wraps images in \pandocbounded and expects the template to define
+% it. Eisvogel 2.4.0 predates that, so every image expanded to an undefined
+% control sequence. This is pandoc's own definition from its default LaTeX
+% template, added only when the template has not supplied one, so a newer
+% Eisvogel keeps its own.
+\makeatletter
+\@ifundefined{pandocbounded}{%
+  \newsavebox\pandoc@box
+  \newcommand*\pandocbounded[1]{%
+    \sbox\pandoc@box{#1}%
+    \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+    \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+    \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi%
+    \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+    \else\usebox{\pandoc@box}%
+    \fi%
+  }%
+}{}%
+\makeatother
+
 % Running head: \leftmark follows the current chapter (or section, if the
 % build ever drops -V book=true). \automark belongs to scrlayer-scrpage, which
 % is not loaded yet, hence the deferral and the guards.

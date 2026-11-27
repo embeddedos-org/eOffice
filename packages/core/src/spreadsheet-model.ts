@@ -905,7 +905,8 @@ export class SpreadsheetModel {
       return strValue.toLowerCase() !== strCriteria.slice(2).toLowerCase();
     }
     if (strCriteria.includes('*') || strCriteria.includes('?')) {
-      const regex = new RegExp('^' + strCriteria.replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'i');
+      const escaped = strCriteria.replace(/([.+^${}()|[\]\\])/g, '\\$1');
+      const regex = new RegExp('^' + escaped.replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'i');
       return regex.test(strValue);
     }
     return strValue.toLowerCase() === strCriteria.toLowerCase();
